@@ -1,0 +1,9 @@
+n: 4
+c: 130
+begin data 
+33	4
+49	5
+60	6
+32	2
+end data 
+sol: 
