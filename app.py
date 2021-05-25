@@ -1267,7 +1267,7 @@ def main():
                 n, w, v, b = read_data_3_single(file_path)
                 st.subheader("Solution")
                 start_time = time.time()
-                res, arr = density_ordered_greedy_ukp(b, v, w)
+                res, arr,poid = density_ordered_greedy_ukp(b, v, w)
                 arr = np.array(arr)
                 dispTime = time.time()
                 pdarr = pd.DataFrame(arr, columns=["Number of elements"])
