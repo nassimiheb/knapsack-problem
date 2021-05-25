@@ -1,8 +1,10 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-import tkinter as tk
-from tkinter import filedialog
+
+# import tkinter as tk
+# from tkinter import filedialog
+import easygui
 import random
 import random as rn
 from numpy.random import choice as np_choice
@@ -37,7 +39,7 @@ n_iterations = 10
 decay = 0.8
 alpha = 1
 beta = 2
-            
+
 ######################### Ant colony ########################
 
 
@@ -245,7 +247,7 @@ class AntColony:
 
         # formule vu en cours
         P = numerateurs / numerateurs.sum()
-        
+
         # choisir l'objet suivant en utilisant les probabilité P
         move = np_choice(liste_cand, 1, p=P)[0]
         # nombre d'objet a prendre
@@ -634,9 +636,9 @@ def weighted_ordered_greedy_ukp(b, v, w, ordre_croissant=False):
 def read_data_3_single(path):  # Ex : instance = 10, 15, 20, 25, ..., 205.
     file = open(path)
     v, b = [], []
-    n = int(file.readline().strip())    
+    n = int(file.readline().strip())
     w = int(file.readline().strip())
-    
+
     for _ in range(n):
         line = file.readline().strip().split()
         v.append(int(line[0]))
@@ -664,7 +666,7 @@ def stats(dir_path, meth):
     files = dir_files(dir_path)
     for file in files:
 
-        n, w, v,b = read_data_3_single(file)
+        n, w, v, b = read_data_3_single(file)
         nbObj.append(n)
         #############################################
 
@@ -684,14 +686,14 @@ def stats(dir_path, meth):
             start_time = time.time()
             weighted_ordered_greedy_ukp(b, v, w, False)
         elif meth == "ag":
-            #random.seed(1)
-            #max_it = 500
-            #max_n = 10
-            #N = 2500
-            #NI = 100
-            #Pc = 0.6
-            #Pm = 0.4
-            #stagnation = True
+            # random.seed(1)
+            # max_it = 500
+            # max_n = 10
+            # N = 2500
+            # NI = 100
+            # Pc = 0.6
+            # Pm = 0.4
+            # stagnation = True
             start_time = time.time()
             AG(n, w, b, v, N, NI, Pc, Pm, max_it, max_n, stagnation)
         elif meth == "hr":
@@ -707,7 +709,7 @@ def stats(dir_path, meth):
             n_best = 10
             n_iterations = 10
             decay = 0.8
-            
+
             colony = AntColony(
                 benifices,
                 poids,
@@ -726,20 +728,17 @@ def stats(dir_path, meth):
             # gain_bb.append()
         time_bb.append(time.time() - start_time)
         #############################################
-  
 
     df = pd.DataFrame(
-            {
-                "ojt": nbObj,
-                "Time":time_bb,
-            }
-        )
-    
+        {
+            "ojt": nbObj,
+            "Time": time_bb,
+        }
+    )
 
     df = df.rename(columns={"ojt": "index"}).set_index("index")
 
     chart = st.line_chart(df)
-
 
 
 def statsComp(
@@ -753,7 +752,7 @@ def statsComp(
     agcheck,
     accheck,
 ):
-    nbObj=[]
+    nbObj = []
     time_bb, time_dp, time_dog, time_wdogT, time_wdogF, time_hr, time_ag, time_ac = (
         [],
         [],
@@ -767,7 +766,7 @@ def statsComp(
     files = dir_files(dir_path)
     for file in files:
 
-        n, w, v,b = read_data_3_single(file)
+        n, w, v, b = read_data_3_single(file)
         nbObj.append(n)
         #############################################
         if bbcheck:
@@ -846,7 +845,7 @@ def statsComp(
 
     df = pd.DataFrame(
         {
-            "ojt":nbObj,
+            "ojt": nbObj,
         }
     )
     if bbcheck:
@@ -867,9 +866,8 @@ def statsComp(
         df["Ant colony"] = time_ac
 
     df = df.rename(columns={"ojt": "index"}).set_index("index")
- 
-    chart = st.line_chart(df)
 
+    chart = st.line_chart(df)
 
 
 #######################################################
@@ -899,7 +897,7 @@ def statsCompGain(
     files = dir_files(dir_path)
     for file in files:
 
-        n, w, v,b = read_data_3_single(file)
+        n, w, v, b = read_data_3_single(file)
         nbObj.append(n)
         #############################################
         if bbcheck:
@@ -948,7 +946,6 @@ def statsCompGain(
             decay = 0.8
             alpha = 1
             beta = 2
-          
 
             colony = AntColony(
                 benifices,
@@ -1120,19 +1117,20 @@ def main():
         st.subheader("Import data (Apply the algorithm on a signle file)")
         col1, col2, col3 = st.beta_columns(3)
         if col2.button("Upload file"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
 
-            file_path = filedialog.askopenfilename(master=root)
+            #file_path = filedialog.askopenfilename(master=root)
+            file_path=easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!" + file_path)
-                n, w, v, b  = read_data_3_single(file_path)
+                n, w, v, b = read_data_3_single(file_path)
                 st.subheader("Solution")
                 start_time = time.time()
                 res, arr = branch_and_bound_ukp(b, v, w)
-                
+
                 arr = np.array(arr)
                 dispTime = time.time()
                 pdarr = pd.DataFrame(arr, columns=["Number of elements"])
@@ -1146,12 +1144,13 @@ def main():
         colo1.subheader("Time Comparaison")
         colo1.text("")
         if colo2.button("Select instances directory"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
 
-            dir_path = filedialog.askdirectory(master=root)
+            #dir_path = filedialog.askdirectory(master=root)
+            dir_path=easygui.diropenbox()
             if dir_path != "":
                 stats(dir_path, "bb")
 
@@ -1190,11 +1189,12 @@ def main():
         st.subheader("Import data (Apply the algorithm on a signle file)")
         col1, col2, col3 = st.beta_columns(3)
         if col2.button("Upload file"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
-            file_path = filedialog.askopenfilename(master=root)
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
+            #file_path = filedialog.askopenfilename(master=root)
+            file_path=easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!")
                 n, w, v, b = read_data_3_single(file_path)
@@ -1216,12 +1216,13 @@ def main():
         colo1.subheader("Time Comparaison")
         colo1.text("")
         if colo2.button("Select instances directory"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
 
-            dir_path = filedialog.askdirectory(master=root)
+            #dir_path = filedialog.askdirectory(master=root)
+            dir_path=easygui.diropenbox()
             if dir_path != "":
                 stats(dir_path, "dp")
 
@@ -1255,11 +1256,12 @@ def main():
         st.subheader("Import data (Apply the algorithm on a signle file)")
         col1, col2, col3 = st.beta_columns(3)
         if col2.button("Upload file"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
-            file_path = filedialog.askopenfilename(master=root)
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
+            #file_path = filedialog.askopenfilename(master=root)
+            file_path=easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!")
                 n, w, v, b = read_data_3_single(file_path)
@@ -1279,12 +1281,13 @@ def main():
         colo1.subheader("Time Comparaison")
         colo1.text("")
         if colo2.button("Select instances directory"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
 
-            dir_path = filedialog.askdirectory(master=root)
+            #dir_path = filedialog.askdirectory(master=root)
+            dir_path=easygui.diropenbox()
             if dir_path != "":
                 stats(dir_path, "dog")
 
@@ -1323,11 +1326,12 @@ def main():
         col1, col2, col3 = st.beta_columns(3)
 
         if col2.button("Upload file"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
-            file_path = filedialog.askopenfilename(master=root)
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
+            #file_path = filedialog.askopenfilename(master=root)
+            file_path=easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!")
                 n, w, v, b = read_data_3_single(file_path)
@@ -1348,12 +1352,13 @@ def main():
         colo1.subheader("Time Comparaison")
         colo1.text("")
         if colo2.button("Select instances directory"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
 
-            dir_path = filedialog.askdirectory(master=root)
+            #dir_path = filedialog.askdirectory(master=root)
+            dir_path=easygui.diropenbox()
             if dir_path != "":
                 if ordreCcheck:
                     stats(dir_path, "wdogF")
@@ -1423,11 +1428,12 @@ def main():
         col1, col2, col3 = st.beta_columns(3)
 
         if col2.button("Upload file"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
-            file_path = filedialog.askopenfilename(master=root)
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
+            #file_path = filedialog.askopenfilename(master=root)
+            file_path=easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!")
                 n, w, v, b = read_data_3_single(file_path)
@@ -1448,12 +1454,13 @@ def main():
         colo1.subheader("Time Comparaison")
         colo1.text("")
         if colo2.button("Select instances directory"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
 
-            dir_path = filedialog.askdirectory(master=root)
+            #dir_path = filedialog.askdirectory(master=root)
+            dir_path=easygui.diropenbox()
             if dir_path != "":
                 stats(dir_path, "hr")
 
@@ -1479,11 +1486,12 @@ def main():
         col1, col2, col3 = st.beta_columns(3)
 
         if col2.button("Upload file"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
-            file_path = filedialog.askopenfilename(master=root)
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
+            #file_path = filedialog.askopenfilename(master=root)
+            file_path=easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!")
                 n, w, v, b = read_data_3_single(file_path)
@@ -1672,14 +1680,15 @@ def main():
         Pc = col2.number_input("Insert a pc")
         Pm = col3.number_input("Insert a pm")
         stagnation = col1.checkbox("stagnation")
-        
+
         if col3.button("Upload file"):
-            
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
-            file_path = filedialog.askopenfilename(master=root)
+
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
+            #file_path = filedialog.askopenfilename(master=root)
+            file_path=easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!")
                 n, w, v, b = read_data_3_single(file_path)
@@ -1707,12 +1716,13 @@ def main():
         colo1.subheader("Time Comparaison")
         colo1.text("")
         if colo2.button("Select instances directory"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
 
-            dir_path = filedialog.askdirectory(master=root)
+            #dir_path = filedialog.askdirectory(master=root)
+            dir_path=easygui.diropenbox()
             if dir_path != "":
                 stats(dir_path, "ag")
 
@@ -1960,7 +1970,7 @@ def main():
 
         st.subheader("Import data (Apply the algorithm on a signle file)")
         col1, col2, col3 = st.beta_columns(3)
-       
+
         n_ants = col1.number_input("Insert a n_ants", format="%d", value=0)
         n_best = col2.number_input("Insert a n_best", format="%d", value=0)
         n_iterations = col3.number_input("Insert a n_iterations", format="%d", value=0)
@@ -1968,21 +1978,21 @@ def main():
         alpha = col2.number_input("Insert a alpha", format="%d", value=0)
         beta = col3.number_input("Insert a beta", format="%d", value=0)
         if col2.button("Upload file"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
-            file_path = filedialog.askopenfilename(master=root)
-
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
+            #file_path = filedialog.askopenfilename(master=root)
+            file_path=easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!")
-                n, w, v, b= read_data_3_single(file_path)
+                n, w, v, b = read_data_3_single(file_path)
                 densitySol = density_ordered_greedy_ukp(b, v, w)
                 benifices = np.array(b)
                 poids = np.array(v)
                 utilites = poids / benifices
                 st.subheader("Solution")
-                
+
                 colony = AntColony(
                     benifices,
                     poids,
@@ -2017,16 +2027,16 @@ def main():
         colo1.subheader("Time Comparaison")
         colo1.text("")
         if colo2.button("Select instances directory"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
 
-            dir_path = filedialog.askdirectory(master=root)
+            #dir_path = filedialog.askdirectory(master=root)
+            dir_path=easygui.diropenbox()
             if dir_path != "":
                 stats(dir_path, "ac")
 
-       
     else:
 
         st.title("Comparaison")
@@ -2045,12 +2055,13 @@ def main():
         agcheck = colo2.checkbox("Genetic Algorithm")
         accheck = colo2.checkbox("Ant colony")
         if col2.button("Select instances directory"):
-            root = tk.Tk()
-            root.focus_get()
-            root.withdraw()
-            root.focus_force()
+            #root = tk.Tk()
+            #root.focus_get()
+            #root.withdraw()
+            #root.focus_force()
 
-            dir_path = filedialog.askdirectory(master=root)
+            #dir_path = filedialog.askdirectory(master=root)
+            dir_path=easygui.diropenbox()
             if dir_path != "":
 
                 st.subheader("Time Comparaison")
