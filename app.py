@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
+import math
 
 # import tkinter as tk
 # from tkinter import filedialog
@@ -11,15 +12,8 @@ from numpy.random import choice as np_choice
 import time
 from os import listdir
 from os.path import isfile, join
-
-##import matplotlib.pyplot as plt
-# from tabulate import tabulate
-
 import time
 
-# b = [5, 4, 6, 2]  # Bénéfice
-# v = [49, 33, 60, 32]  # Volume
-# w = 130
 st.set_page_config(
     page_title="knapsack problem solver app",
     page_icon="🧊",
@@ -39,9 +33,234 @@ n_iterations = 10
 decay = 0.8
 alpha = 1
 beta = 2
+######################### Recuit simulé ########################
+# Mise a jour de la temperature
+def cool(temprature, coolingFactor):
+    return temprature * coolingFactor
+
+# Definir le voisinage d'une solution
+def getNeighbour(solution, taille, tab_poids_new, capacity):
+    np.random.seed()
+    sol = solution.copy()
+    i = 0
+    # generer un indice aleatoire
+    x = np.random.randint(taille)
+    # alterer la valeur de la solution correspondante a l'indice de 1 a 0
+    if sol[x] == 1:
+        sol[x] = 0
+    # essayer d'alterer une des valeurs de la solution de 0 a 1
+    else:
+        capacityRest = capacity - get_poids_total(sol, tab_poids_new)
+        listItemCanEnter = []
+        for i in range(len(sol)):
+            if capacityRest > tab_poids_new[i] and sol[i] == 0:
+                listItemCanEnter.append(i)
+        if len(listItemCanEnter) != 0:
+            ind = np.random.randint(len(listItemCanEnter))
+            sol[listItemCanEnter[ind]] = 1
+        # essayer d'alterer une des valeurs de la solution de 1 a 0
+        else:
+            listItemPris = []
+            for i in range(len(sol)):
+                if sol[i] == 1:
+                    listItemPris.append(i)
+            if len(listItemPris) != 0:
+                ind = np.random.randint(len(listItemPris))
+                sol[listItemPris[ind]] = 0
+            # essayer d'alterer une des valeurs de la solution de 0 a 1
+            capacityRest = capacity - get_poids_total(sol, tab_poids_new)
+            listItemCanEnter = []
+            for i in range(len(sol)):
+                if capacityRest > tab_poids_new[i] and sol[i] == 0:
+                    listItemCanEnter.append(i)
+            if len(listItemCanEnter) != 0:
+                ind = np.random.randint(len(listItemCanEnter))
+                sol[listItemCanEnter[ind]] = 1
+    return sol
+
+# passage d'une solution a une autre
+def getNextState(solution, taille, tab_poids_new, tab_gain_new, capacity, temperature):
+
+    # generer le voisin
+    newSolution = getNeighbour(solution, taille, tab_poids_new, capacity)
+    # evaluer le voisin
+    evalNewSol = eval_solution(newSolution, tab_gain_new)
+    # evaluer l'ancienne solution
+    evalOldSol = eval_solution(solution, tab_gain_new)
+    # calculer delta
+    delta = evalNewSol - evalOldSol
+
+    if delta > 0:
+        return newSolution  # solution meilleur => accepée
+    else:
+        x = np.random.rand()  # generer un nombre aleatoire
+
+        # critere d'acceptation de la solution
+        if x < math.exp(delta / temperature):
+            return newSolution  # verifié => accepter nouvelle solution
+        else:
+            return solution  # non verifié => garder l'ancienne solution
+
+# evaluation d'une solution obtenue
+def eval_solution(solution, tab_gain_new):
+    gain_total = 0
+    for i in range(len(solution)):
+        gain_total = gain_total + solution[i] * tab_gain_new[i]
+
+    return gain_total
+
+# trier par utilité
+def trier_objet_utility(items):
+    items.sort(key=lambda x: x[1] / x[0], reverse=True)
+    return items
+
+# le nombre maximal que peut contenir le sac de chaque objet
+def get_max_number_item(items, capacity=0):
+    tab_number = [capacity // item[0] for item in items]
+    return tab_number, sum(tab_number)
+
+# definir une table de gain correspondante a l'écriture binaire d'une solution
+def get_tab_gain_new(items_sorted, tab_max_nb):
+    tab_gain = []
+    for i in range(len(tab_max_nb)):
+        tab = [items_sorted[i][1]] * tab_max_nb[i]
+        tab_gain = tab_gain + tab
+
+    return tab_gain
+
+# definir une table de poids  correspondante a l'ecriture binaire d'une solution
+def get_tab_poid_new(items_sorted, tab_max_nb):
+    tab_poid = []
+    for i in range(len(tab_max_nb)):
+        tab = [items_sorted[i][0]] * tab_max_nb[i]
+        tab_poid = tab_poid + tab
+    return tab_poid
+
+# le poids obtenue par une solution ecrite sous sa forme binaire
+def get_poids_total(bsol, tab_poid_new):
+    poid_total = 0
+    for i in range(len(bsol)):
+        poid_total = poid_total + bsol[i] * tab_poid_new[i]
+    return poid_total
+
+# convertir une solution en n en une forme binaire
+def ntobinary(nsol, max_num_tab):
+    bsol = []
+    for i in range(len(max_num_tab)):
+        for p in range(nsol[i]):
+            bsol.append(1)
+        for p in range(nsol[i], max_num_tab[i]):
+            bsol.append(0)
+    return bsol
+
+# generer une solution aleatoire
+def gen_random_sol(tab, n, capacity):
+    weight = []
+    profits = []
+    capacityleft = capacity
+    sol = []
+    # initialiser la solution avec des 0
+    for k in range(0, n):
+        sol.append(0)
+    for i in range(0, n):
+        weight.append(tab[i][0])
+        profits.append(tab[i][1])
+    j = 0
+    # TQ capacité max non atteinte
+    while j < n and capacityleft > 0:
+        # generer un indice aleatoire
+        index = np.random.randint(0, n - 1)
+        # calculer le nombre maximale d'exemplaires qu'on peut rajouter
+        maxQuantity = int(capacityleft / weight[index]) + 1
+        if maxQuantity == 0:
+            nbItems = 0
+        else:  # si maxQuantity>0 generer un nombre aleatoire d'exemplaires inferieurs a maxQuantity
+            nbItems = np.random.randint(0, maxQuantity)
+        sol[index] = nbItems
+        capacityleft = capacityleft - weight[index] * sol[index]
+        j = j + 1
+
+    gain_out = 0  # calculer le gain obtenu
+    for i in range(n):
+        gain_out = gain_out + profits[i] * sol[i]
+
+    return gain_out, capacityleft, sol
+
+# convertir une solution binaire en une solution en n
+def binaryToNsolution(solution, tab_max_nb):
+    solN = []
+    indMin = 0
+    for i in range(len(tab_max_nb)):
+        indMax = indMin + tab_max_nb[i]
+        solN.append(sum(solution[indMin:indMax]))
+        indMin = indMax
+    return solN
+
+# la fonction principale du recuit simulé
+def simulatedAnnealing(
+    itemsIn,
+    capacity,
+    solinit,
+    samplingSize,
+    temperatureInit,
+    coolingFactor,
+    endingTemperature,
+):
+    items = itemsIn.copy()
+    for i in range(len(items)):
+        items[i].append(solinit[i])
+    # trier objets par utilité
+    items_sorted = trier_objet_utility(items)
+    # reordonner la solution
+    solinitsorted = []
+    for i in range(len(items_sorted)):
+        solinitsorted.append(items_sorted[i][2])
+    # recupere le tabeau contenant le nombre max d'exemplaires de chaque objet
+    tab_max_nb, taille = get_max_number_item(items_sorted, capacity)
+    tab_poids_new = get_tab_poid_new(items_sorted, tab_max_nb)
+    tab_gain_new = get_tab_gain_new(items_sorted, tab_max_nb)
+    # convertir la solution en une solution binaire
+    solCurrent = ntobinary(solinitsorted, tab_max_nb)
+    # evaluer la solution
+    evalsol = eval_solution(solCurrent, tab_gain_new)
+    # recuperer la temperature initaile
+    temperature = temperatureInit
+    # initialiser la meilleur solution
+    bestSol = solCurrent.copy()
+    bestEval = evalsol
+    while temperature > endingTemperature:
+
+        for i in range(samplingSize):
+            # passage a une nouvelle configuration
+            solCurrent = getNextState(
+                solCurrent, taille, tab_poids_new, tab_gain_new, capacity, temperature
+            )
+            # evaluer la nouvelle configuation
+            evalCurrent = eval_solution(solCurrent, tab_gain_new)
+            # si meilleur MAJ de la meilleur solution
+            if evalCurrent > bestEval:
+                bestSol = solCurrent.copy()
+                bestEval = evalCurrent
+        # MAJ la temperature
+        temperature = cool(temperature, coolingFactor)
+
+    objects = []
+    solution = []
+    # convertir la solution binaire trouver en une solution en n
+    Nsol = binaryToNsolution(bestSol, tab_max_nb)
+    for i, item in enumerate(Nsol):
+        if item != 0:
+            objects.append(items[i])
+            solution.append(item)
+    poids = 0
+    for i, obj in enumerate(objects):
+        poids += obj[0] * solution[i]
+    # retourne la solution son gain et son poids
+    return objects, solution, Nsol, bestEval, poids
+
+############################################################################################################
 
 ######################### Ant colony ########################
-
 
 class AntColony:
     def __init__(
@@ -117,12 +336,13 @@ class AntColony:
             # Mettre a jour la meilleure solution globale
             if best_solution[1] > best_solution_all_time[1]:
                 best_solution_all_time = best_solution
+
             # evaporation de pheromone
             self.pheromone = self.pheromone * self.decay
             self.pheromone[self.pheromone < 1] = 1
 
-        print(self.gen_sol_gain(best_solution_all_time[0]))
-        print(self.gen_path_poid(best_solution_all_time[0]))
+        # print(self.gen_sol_gain(best_solution_all_time[0]))
+        # print(self.gen_path_poid(best_solution_all_time[0]))
         return best_solution_all_time
 
     def spread_pheronome(self, solutions, n_best, best_solution):
@@ -183,13 +403,16 @@ class AntColony:
         pheromone[list(visited)] = 0
         # rn.choices returns a list with the randomly selected element from the list.
         # weights to affect a probability for each element
+
         c = rn.choices(self.all_inds, weights=[p for p in pheromone], k=n_candidats)
+        c = list(set(c))
         i = len(c)
-        while i < n_candidats:
-            n = rn.randint(0, self.n_objets - 1)
-            if n not in visited:
-                c.append(n)
-                i += 1
+        """while i<n_candidats:
+          n=rn.randint(0,self.n_objets-1)
+          if n not in visited:
+            c.append(n)
+            i+=1"""
+        nb_candidats = len(c)
 
         return c, pheromone
 
@@ -219,10 +442,12 @@ class AntColony:
             move, nb = self.pick_move(
                 pheromones, candidats, n_candidats, self.utilites, visited
             )
-            candidats.pop(candidats.index(move))
-            pheromones[
-                move
-            ] = 0  # rendre le pheromone à 0 pour indiquer qu'il a été visité
+            toPop = candidats.index(move)
+            candidats.pop(toPop)
+            n_candidats -= 1
+            np.delete(
+                pheromones, toPop
+            )  # rendre le pheromone à 0 pour indiquer qu'il a été visité
 
             # Mise a jour poidRestant et gain de la solution
             poidrestant -= self.poids[move] * nb
@@ -235,10 +460,11 @@ class AntColony:
 
             # ajouter l'objet a visited
             visited.add(move)
-
+        # print("s",i,sol,gain)
         return sol, gain, self.W - poidrestant
 
     def pick_move(self, pheromone, liste_cand, n_candidats, utilite, visited):
+
         pheromone = pheromone.copy()[liste_cand]
         # generer le regle de déplacement sur les candidat
         numerateurs = (pheromone ** self.alpha) * (
@@ -246,6 +472,7 @@ class AntColony:
         )
 
         # formule vu en cours
+
         P = numerateurs / numerateurs.sum()
 
         # choisir l'objet suivant en utilisant les probabilité P
@@ -663,42 +890,44 @@ def rotated(array_2d):
 def stats(dir_path, meth):
     nbObj = []
     time_bb = []
+    gain = []
+
     files = dir_files(dir_path)
     for file in files:
 
         n, w, v, b = read_data_3_single(file)
         nbObj.append(n)
         #############################################
-
+        if meth == "rs":
+            start_time = time.time()
+            sol = density_ordered_greedy_ukp(b, v, w)[1]
+            gain_out, capacityleft, sol = gen_random_sol(b, n, w)
+            objects, solution, Nsol, bestEval, poids = simulatedAnnealing(
+                b, w, sol, 5, 1000, 0.9, 5
+            )
+            gain.append(bestEval)
         if meth == "bb":
             start_time = time.time()
-            branch_and_bound_ukp(b, v, w)
+            gain.append(branch_and_bound_ukp(b, v, w)[0])
+
         elif meth == "dp":
             start_time = time.time()
-            dp_ukp(w, n, b, v)
+            gain.append(dp_ukp(w, n, b, v)[0])
         elif meth == "dog":
             start_time = time.time()
-            density_ordered_greedy_ukp(b, v, w)
+            gain.append(density_ordered_greedy_ukp(b, v, w)[0])
         elif meth == "wdogT":
             start_time = time.time()
-            weighted_ordered_greedy_ukp(b, v, w, True)
+            gain.append(weighted_ordered_greedy_ukp(b, v, w, True)[0])
         elif meth == "wdogF":
             start_time = time.time()
-            weighted_ordered_greedy_ukp(b, v, w, False)
+            gain.append(weighted_ordered_greedy_ukp(b, v, w, False)[0])
         elif meth == "ag":
-            # random.seed(1)
-            # max_it = 500
-            # max_n = 10
-            # N = 2500
-            # NI = 100
-            # Pc = 0.6
-            # Pm = 0.4
-            # stagnation = True
             start_time = time.time()
-            AG(n, w, b, v, N, NI, Pc, Pm, max_it, max_n, stagnation)
+            gain.append(AG(n, w, b, v, N, NI, Pc, Pm, max_it, max_n, stagnation)[0])
         elif meth == "hr":
             start_time = time.time()
-            heuristic_arrondi(b, v, w)
+            gain.append(heuristic_arrondi(b, v, w)[2])
         elif meth == "ac":
             start_time = time.time()
             densitySol = density_ordered_greedy_ukp(b, v, w)
@@ -724,7 +953,7 @@ def stats(dir_path, meth):
                 alpha=1,
                 beta=1,
             )
-            colony.run(30, densitySol)[0]
+            gain.append(colony.run(30, densitySol)[1])
             # gain_bb.append()
         time_bb.append(time.time() - start_time)
         #############################################
@@ -739,8 +968,25 @@ def stats(dir_path, meth):
     df = df.rename(columns={"ojt": "index"}).set_index("index")
 
     chart = st.line_chart(df)
+    st.text("")
+    st.subheader("Gain results")
+    st.text("")
+    df1 = pd.DataFrame(
+        {
+            "ojt": nbObj,
+            "Gain": gain,
+        }
+    )
+
+    df1 = df1.rename(columns={"ojt": "index"}).set_index("index")
+
+    chart = st.line_chart(df1)
 
 
+##############################################################################################################
+
+
+##############################################################################################################
 def statsComp(
     dir_path,
     bbcheck,
@@ -751,9 +997,41 @@ def statsComp(
     hrcheck,
     agcheck,
     accheck,
+    rscheck,
 ):
     nbObj = []
-    time_bb, time_dp, time_dog, time_wdogT, time_wdogF, time_hr, time_ag, time_ac = (
+    (
+        time_bb,
+        time_dp,
+        time_dog,
+        time_wdogT,
+        time_wdogF,
+        time_hr,
+        time_ag,
+        time_ac,
+        time_rs,
+    ) = (
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+    )
+
+    (
+        gain_bb,
+        gain_dp,
+        gain_dog,
+        gain_wdogT,
+        gain_wdogF,
+        gain_hr,
+        gain_ag,
+        gain_ac,
+        gain_rs,
+    ) = (
         [],
         [],
         [],
@@ -769,56 +1047,57 @@ def statsComp(
         n, w, v, b = read_data_3_single(file)
         nbObj.append(n)
         #############################################
+        if rscheck:
+            start_time = time.time()
+            sol = density_ordered_greedy_ukp(b, v, w)[1]
+            gain_out, capacityleft, sol = gen_random_sol(b, n, w)
+            objects, solution, Nsol, bestEval, poids = simulatedAnnealing(
+                b, w, sol, 5, 1000, 0.9, 5
+            )
+            time_rs.append(time.time() - start_time)
+            gain_rs.append(bestEval)
         if bbcheck:
             start_time = time.time()
-            branch_and_bound_ukp(b, v, w)
+            gain = branch_and_bound_ukp(b, v, w)[0]
             time_bb.append(time.time() - start_time)
+            gain_bb.append(gain)
         if dpcheck:
             start_time = time.time()
-            dp_ukp(w, n, b, v)
+            gain = dp_ukp(w, n, b, v)[0]
             time_dp.append(time.time() - start_time)
+            gain_dp.append(gain)
         if dogcheck:
             start_time = time.time()
-            density_ordered_greedy_ukp(b, v, w)
+            gain = density_ordered_greedy_ukp(b, v, w)[0]
             time_dog.append(time.time() - start_time)
+            gain_dog.append(gain)
         if wdogTcheck:
             start_time = time.time()
-            weighted_ordered_greedy_ukp(b, v, w, True)
+            gain = weighted_ordered_greedy_ukp(b, v, w, True)[0]
             time_wdogT.append(time.time() - start_time)
+            gain_wdogT.append(gain)
         if wdogFcheck:
             start_time = time.time()
-            weighted_ordered_greedy_ukp(b, v, w, False)
+            gain = weighted_ordered_greedy_ukp(b, v, w, False)[0]
             time_wdogF.append(time.time() - start_time)
+            gain_wdogF.append(gain)
         if hrcheck:
             start_time = time.time()
-            heuristic_arrondi(b, v, w)
+            gain = heuristic_arrondi(b, v, w)[2]
             time_hr.append(time.time() - start_time)
+            gain_hr.append(gain)
         if agcheck:
             random.seed(1)
-            max_it = 500
-            max_n = 10
-            N = 2500
-            NI = 100
-            Pc = 0.6
-            Pm = 0.4
-            stagnation = True
             start_time = time.time()
-            AG(n, w, b, v, N, NI, Pc, Pm, max_it, max_n, stagnation)
+            gain = AG(n, w, b, v, N, NI, Pc, Pm, max_it, max_n, stagnation)[0]
             time_ag.append(time.time() - start_time)
+            gain_ag.append(gain)
         if accheck:
             start_time = time.time()
             densitySol = density_ordered_greedy_ukp(b, v, w)
             benifices = np.array(b)
             poids = np.array(v)
             utilites = poids / benifices
-
-            n_ants = 100
-            n_best = 10
-            n_iterations = 10
-            decay = 0.8
-            alpha = 1
-            beta = 2
-            print(w)
 
             colony = AntColony(
                 benifices,
@@ -834,15 +1113,11 @@ def statsComp(
                 alpha=1,
                 beta=1,
             )
-            colony.run(30, densitySol)
+            gain = colony.run(30, densitySol)[1]
             time_ac.append(time.time() - start_time)
+            gain_ac.append(gain)
 
         #############################################
-    # data_gain = [gain_bb]
-    # data_gain_rotated = list(rotated(data_gain))
-    # data_time = [ time_bb]
-    # data_time_rotated = list(rotated(data_time))
-
     df = pd.DataFrame(
         {
             "ojt": nbObj,
@@ -864,136 +1139,48 @@ def statsComp(
         df["Genetic Algorithm"] = time_ag
     if accheck:
         df["Ant colony"] = time_ac
+    if rscheck:
+        df["Recuit simulé"] = time_rs
 
     df = df.rename(columns={"ojt": "index"}).set_index("index")
 
     chart = st.line_chart(df)
-
-
-#######################################################
-def statsCompGain(
-    dir_path,
-    bbcheck,
-    dpcheck,
-    dogcheck,
-    wdogTcheck,
-    wdogFcheck,
-    hrcheck,
-    agcheck,
-    accheck,
-):
-
-    gain_bb, gain_dp, gain_dog, gain_wdogT, gain_wdogF, gain_hr, gain_ag, gain_ac = (
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-    )
-    nbObj = []
-    files = dir_files(dir_path)
-    for file in files:
-
-        n, w, v, b = read_data_3_single(file)
-        nbObj.append(n)
-        #############################################
-        if bbcheck:
-
-            gain_bb.append(branch_and_bound_ukp(b, v, w))
-
-        if dpcheck:
-
-            gain_dp.append(dp_ukp(w, n, b, v)[0])
-
-        if dogcheck:
-
-            gain_dog.append(density_ordered_greedy_ukp(b, v, w)[0])
-
-        if wdogTcheck:
-            gain_wdogT.append(weighted_ordered_greedy_ukp(b, v, w, True)[0])
-
-        if wdogFcheck:
-            gain_wdogF.append(weighted_ordered_greedy_ukp(b, v, w, False)[0])
-
-        if hrcheck:
-
-            gain_hr.append(heuristic_arrondi(b, v, w)[0])
-
-        if agcheck:
-            random.seed(1)
-            max_it = 500
-            max_n = 10
-            N = 2500
-            NI = 100
-            Pc = 0.6
-            Pm = 0.4
-            stagnation = True
-
-            gain_ag.append(AG(n, w, b, v, N, NI, Pc, Pm, max_it, max_n, stagnation)[0])
-        if accheck:
-
-            densitySol = density_ordered_greedy_ukp(b, v, w)
-            benifices = np.array(b)
-            poids = np.array(v)
-            utilites = poids / benifices
-
-            n_ants = 100
-            n_best = 10
-            n_iterations = 10
-            decay = 0.8
-            alpha = 1
-            beta = 2
-
-            colony = AntColony(
-                benifices,
-                poids,
-                utilites,
-                n,
-                w,
-                densitySol[1],
-                n_ants,
-                n_best,
-                n_iterations,
-                decay,
-                alpha=1,
-                beta=1,
-            )
-
-            gain_ac.append(colony.run(30, densitySol)[1])
-
-        #############################################
-    # data_gain = [gain_bb]
-    # data_gain_rotated = list(rotated(data_gain))
-    # data_time = [ time_bb]
-    # data_time_rotated = list(rotated(data_time))
-
-    df = pd.DataFrame(
+    st.text("")
+    st.text("")
+    st.subheader("Gain comparaison")
+    st.text("")
+    st.text("")
+    df1 = pd.DataFrame(
         {
             "ojt": nbObj,
         }
     )
     if bbcheck:
-        df["Branch and Bound"] = gain_bb
+        df1["Branch and Bound"] = gain_bb
     if dpcheck:
-        df["Dynamic Programing"] = gain_dp
+        df1["Dynamic Programing"] = gain_dp
     if dogcheck:
-        df["Density Ordered Greedy"] = gain_dog
+        df1["Density Ordered Greedy"] = gain_dog
     if wdogTcheck:
-        df["Weighted Ordered Greedy (true)"] = gain_wdogT
+        df1["Weighted Ordered Greedy (true)"] = gain_wdogT
     if wdogFcheck:
-        df["Weighted Ordered Greedy (false)"] = gain_wdogF
+        df1["Weighted Ordered Greedy (false)"] = gain_wdogF
     if hrcheck:
-        df["Heuristic By Rounding"] = gain_hr
+        df1["Heuristic By Rounding"] = gain_hr
     if agcheck:
-        df["Genetic Algorithm"] = gain_ag
+        df1["Genetic Algorithm"] = gain_ag
     if accheck:
-        df["Ant colony"] = gain_ac
+        df1["Ant colony"] = gain_ac
+    if rscheck:
+        df["Recuit simulé"] = gain_rs
 
-    df = df.rename(columns={"ojt": "index"}).set_index("index")
-    chart = st.line_chart(df)
+    df1 = df1.rename(columns={"ojt": "index"}).set_index("index")
+    chart1 = st.line_chart(df1)
+
+
+#######################################################
+
+#############################################
 
 
 ############ UI ############
@@ -1008,6 +1195,7 @@ def main():
             "Density Ordered Greedy",
             "Weighted Ordered Greedy",
             "Heuristic By Rounding",
+            "Recuit simulé",
             "Genetic Algorithm",
             "Ant colony",
             "Comparaison",
@@ -1117,13 +1305,13 @@ def main():
         st.subheader("Import data (Apply the algorithm on a signle file)")
         col1, col2, col3 = st.beta_columns(3)
         if col2.button("Upload file"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
+            # root = tk.Tk()
+            # root.focus_get()
+            # root.withdraw()
+            # root.focus_force()
 
-            #file_path = filedialog.askopenfilename(master=root)
-            file_path=easygui.fileopenbox()
+            # file_path = filedialog.askopenfilename(master=root)
+            file_path = easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!" + file_path)
                 n, w, v, b = read_data_3_single(file_path)
@@ -1141,16 +1329,16 @@ def main():
                 )
         colo1, colo2 = st.beta_columns((2, 1))
         colo2.text("")
-        colo1.subheader("Time Comparaison")
+        colo1.subheader("Time results")
         colo1.text("")
         if colo2.button("Select instances directory"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
+            # root = tk.Tk()
+            # root.focus_get()
+            # root.withdraw()
+            # root.focus_force()
 
-            #dir_path = filedialog.askdirectory(master=root)
-            dir_path=easygui.diropenbox()
+            # dir_path = filedialog.askdirectory(master=root)
+            dir_path = easygui.diropenbox()
             if dir_path != "":
                 stats(dir_path, "bb")
 
@@ -1189,12 +1377,12 @@ def main():
         st.subheader("Import data (Apply the algorithm on a signle file)")
         col1, col2, col3 = st.beta_columns(3)
         if col2.button("Upload file"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
-            #file_path = filedialog.askopenfilename(master=root)
-            file_path=easygui.fileopenbox()
+            # root = tk.Tk()
+            # root.focus_get()
+            # root.withdraw()
+            # root.focus_force()
+            # file_path = filedialog.askopenfilename(master=root)
+            file_path = easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!")
                 n, w, v, b = read_data_3_single(file_path)
@@ -1213,16 +1401,16 @@ def main():
                 )
         colo1, colo2 = st.beta_columns((2, 1))
         colo2.text("")
-        colo1.subheader("Time Comparaison")
+        colo1.subheader("Time results")
         colo1.text("")
         if colo2.button("Select instances directory"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
+            # root = tk.Tk()
+            # root.focus_get()
+            # root.withdraw()
+            # root.focus_force()
 
-            #dir_path = filedialog.askdirectory(master=root)
-            dir_path=easygui.diropenbox()
+            # dir_path = filedialog.askdirectory(master=root)
+            dir_path = easygui.diropenbox()
             if dir_path != "":
                 stats(dir_path, "dp")
 
@@ -1256,18 +1444,18 @@ def main():
         st.subheader("Import data (Apply the algorithm on a signle file)")
         col1, col2, col3 = st.beta_columns(3)
         if col2.button("Upload file"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
-            #file_path = filedialog.askopenfilename(master=root)
-            file_path=easygui.fileopenbox()
+            # root = tk.Tk()
+            # root.focus_get()
+            # root.withdraw()
+            # root.focus_force()
+            # file_path = filedialog.askopenfilename(master=root)
+            file_path = easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!")
                 n, w, v, b = read_data_3_single(file_path)
                 st.subheader("Solution")
                 start_time = time.time()
-                res, arr,poid = density_ordered_greedy_ukp(b, v, w)
+                res, arr, poid = density_ordered_greedy_ukp(b, v, w)
                 arr = np.array(arr)
                 dispTime = time.time()
                 pdarr = pd.DataFrame(arr, columns=["Number of elements"])
@@ -1278,16 +1466,16 @@ def main():
                 )
         colo1, colo2 = st.beta_columns((2, 1))
         colo2.text("")
-        colo1.subheader("Time Comparaison")
+        colo1.subheader("Time results")
         colo1.text("")
         if colo2.button("Select instances directory"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
+            # root = tk.Tk()
+            # root.focus_get()
+            # root.withdraw()
+            # root.focus_force()
 
-            #dir_path = filedialog.askdirectory(master=root)
-            dir_path=easygui.diropenbox()
+            # dir_path = filedialog.askdirectory(master=root)
+            dir_path = easygui.diropenbox()
             if dir_path != "":
                 stats(dir_path, "dog")
 
@@ -1326,12 +1514,12 @@ def main():
         col1, col2, col3 = st.beta_columns(3)
 
         if col2.button("Upload file"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
-            #file_path = filedialog.askopenfilename(master=root)
-            file_path=easygui.fileopenbox()
+            # root = tk.Tk()
+            # root.focus_get()
+            # root.withdraw()
+            # root.focus_force()
+            # file_path = filedialog.askopenfilename(master=root)
+            file_path = easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!")
                 n, w, v, b = read_data_3_single(file_path)
@@ -1349,19 +1537,20 @@ def main():
 
         colo1, colo2 = st.beta_columns((2, 1))
         colo2.text("")
-        colo1.subheader("Time Comparaison")
+        colo1.subheader("Time results")
         colo1.text("")
         if colo2.button("Select instances directory"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
+            # root = tk.Tk()
+            # root.focus_get()
+            # root.withdraw()
+            # root.focus_force()
 
-            #dir_path = filedialog.askdirectory(master=root)
-            dir_path=easygui.diropenbox()
+            # dir_path = filedialog.askdirectory(master=root)
+            dir_path = easygui.diropenbox()
             if dir_path != "":
                 if ordreCcheck:
-                    stats(dir_path, "wdogF")
+                    stats(dir_path, "wdogT")
+
                 else:
                     stats(dir_path, "wdogF")
 
@@ -1369,7 +1558,7 @@ def main():
         st.title("Heuristic By Rounding Algorithm")
         st.subheader("Description")
         st.write(
-            "This approach involves sorting objects in ascending or descending order of their weight (or volumes). The list of objects thus sorted is scanned and for each type of object, we take as many copies of the latter as possible and so on until the complete scan of the list of objects. This heuristic very seldom gives good results. Often, it is better to sort objects according to the descending order of their weight because usually objects, with small weights, have a small gain"
+            "This heuristic, based on the greedy order Density approach, builds a solution piece by piece, always choosing the next piece that offers the most obvious and immediate advantage without with regard to future consequences. It produces good results that are close to optimal."
         )
 
         st.subheader("Algorithm")
@@ -1428,12 +1617,12 @@ def main():
         col1, col2, col3 = st.beta_columns(3)
 
         if col2.button("Upload file"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
-            #file_path = filedialog.askopenfilename(master=root)
-            file_path=easygui.fileopenbox()
+            # root = tk.Tk()
+            # root.focus_get()
+            # root.withdraw()
+            # root.focus_force()
+            # file_path = filedialog.askopenfilename(master=root)
+            file_path = easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!")
                 n, w, v, b = read_data_3_single(file_path)
@@ -1451,31 +1640,265 @@ def main():
 
         colo1, colo2 = st.beta_columns((2, 1))
         colo2.text("")
-        colo1.subheader("Time Comparaison")
+        colo1.subheader("Time results")
         colo1.text("")
         if colo2.button("Select instances directory"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
+            # root = tk.Tk()
+            # root.focus_get()
+            # root.withdraw()
+            # root.focus_force()
 
-            #dir_path = filedialog.askdirectory(master=root)
-            dir_path=easygui.diropenbox()
+            # dir_path = filedialog.askdirectory(master=root)
+            dir_path = easygui.diropenbox()
             if dir_path != "":
                 stats(dir_path, "hr")
 
-    elif page == "Recuit simulé ":
+    elif page == "Recuit simulé":
         st.title("Recuit simulé Algorithm")
         st.subheader("Description")
         st.write(
-            "This approach involves sorting objects in ascending or descending order of their weight (or volumes). The list of objects thus sorted is scanned and for each type of object, we take as many copies of the latter as possible and so on until the complete scan of the list of objects. This heuristic very seldom gives good results. Often, it is better to sort objects according to the descending order of their weight because usually objects, with small weights, have a small gain"
+            "Is an iterative procedure that seeks lower cost configurations while accepting controlled manner of configurations that degrade the cost function. At each step, the simulated annealing heuristics considers a state close s * to the current state s, and decide probabilistically between moving the system to state s * or staying in state s. These probabilities eventually lead the system to move to lower cost statements. In general, this step is repeated until the system reaches a state that is good enough for the application, or until a given calculation budget is exhausted"
         )
 
         st.subheader("Algorithm")
 
         st.code(
             """
-          
+        def cool(temprature, coolingFactor):
+            return temprature * coolingFactor
+
+
+        # Definir le voisinage d'une solution
+        def getNeighbour(solution, taille, tab_poids_new, capacity):
+            np.random.seed()
+            sol = solution.copy()
+            i = 0
+            # generer un indice aleatoire
+            x = np.random.randint(taille)
+            # alterer la valeur de la solution correspondante a l'indice de 1 a 0
+            if sol[x] == 1:
+                sol[x] = 0
+            # essayer d'alterer une des valeurs de la solution de 0 a 1
+            else:
+                capacityRest = capacity - get_poids_total(sol, tab_poids_new)
+                listItemCanEnter = []
+                for i in range(len(sol)):
+                    if capacityRest > tab_poids_new[i] and sol[i] == 0:
+                        listItemCanEnter.append(i)
+                if len(listItemCanEnter) != 0:
+                    ind = np.random.randint(len(listItemCanEnter))
+                    sol[listItemCanEnter[ind]] = 1
+                # essayer d'alterer une des valeurs de la solution de 1 a 0
+                else:
+                    listItemPris = []
+                    for i in range(len(sol)):
+                        if sol[i] == 1:
+                            listItemPris.append(i)
+                    if len(listItemPris) != 0:
+                        ind = np.random.randint(len(listItemPris))
+                        sol[listItemPris[ind]] = 0
+                    # essayer d'alterer une des valeurs de la solution de 0 a 1
+                    capacityRest = capacity - get_poids_total(sol, tab_poids_new)
+                    listItemCanEnter = []
+                    for i in range(len(sol)):
+                        if capacityRest > tab_poids_new[i] and sol[i] == 0:
+                            listItemCanEnter.append(i)
+                    if len(listItemCanEnter) != 0:
+                        ind = np.random.randint(len(listItemCanEnter))
+                        sol[listItemCanEnter[ind]] = 1
+            return sol
+
+
+        # passage d'une solution a une autre
+        def getNextState(solution, taille, tab_poids_new, tab_gain_new, capacity, temperature):
+
+            # generer le voisin
+            newSolution = getNeighbour(solution, taille, tab_poids_new, capacity)
+            # evaluer le voisin
+            evalNewSol = eval_solution(newSolution, tab_gain_new)
+            # evaluer l'ancienne solution
+            evalOldSol = eval_solution(solution, tab_gain_new)
+            # calculer delta
+            delta = evalNewSol - evalOldSol
+
+            if delta > 0:
+                return newSolution  # solution meilleur => accepée
+            else:
+                x = np.random.rand()  # generer un nombre aleatoire
+
+                # critere d'acceptation de la solution
+                if x < math.exp(delta / temperature):
+                    return newSolution  # verifié => accepter nouvelle solution
+                else:
+                    return solution  # non verifié => garder l'ancienne solution
+
+
+        # evaluation d'une solution obtenue
+        def eval_solution(solution, tab_gain_new):
+            gain_total = 0
+            for i in range(len(solution)):
+                gain_total = gain_total + solution[i] * tab_gain_new[i]
+
+            return gain_total
+
+
+        # trier par utilité
+        def trier_objet_utility(items):
+            items.sort(key=lambda x: x[1] / x[0], reverse=True)
+            return items
+
+
+        # le nombre maximal que peut contenir le sac de chaque objet
+        def get_max_number_item(items, capacity=0):
+            tab_number = [capacity // item[0] for item in items]
+            return tab_number, sum(tab_number)
+
+
+        # definir une table de gain correspondante a l'écriture binaire d'une solution
+        def get_tab_gain_new(items_sorted, tab_max_nb):
+            tab_gain = []
+            for i in range(len(tab_max_nb)):
+                tab = [items_sorted[i][1]] * tab_max_nb[i]
+                tab_gain = tab_gain + tab
+
+            return tab_gain
+
+
+        # definir une table de poids  correspondante a l'ecriture binaire d'une solution
+        def get_tab_poid_new(items_sorted, tab_max_nb):
+            tab_poid = []
+            for i in range(len(tab_max_nb)):
+                tab = [items_sorted[i][0]] * tab_max_nb[i]
+                tab_poid = tab_poid + tab
+            return tab_poid
+
+
+        # le poids obtenue par une solution ecrite sous sa forme binaire
+        def get_poids_total(bsol, tab_poid_new):
+            poid_total = 0
+            for i in range(len(bsol)):
+                poid_total = poid_total + bsol[i] * tab_poid_new[i]
+            return poid_total
+
+
+        # convertir une solution en n en une forme binaire
+        def ntobinary(nsol, max_num_tab):
+            bsol = []
+            for i in range(len(max_num_tab)):
+                for p in range(nsol[i]):
+                    bsol.append(1)
+                for p in range(nsol[i], max_num_tab[i]):
+                    bsol.append(0)
+            return bsol
+
+
+        # generer une solution aleatoire
+        def gen_random_sol(tab, n, capacity):
+            weight = []
+            profits = []
+            capacityleft = capacity
+            sol = []
+            # initialiser la solution avec des 0
+            for k in range(0, n):
+                sol.append(0)
+            for i in range(0, n):
+                weight.append(tab[i][0])
+                profits.append(tab[i][1])
+            j = 0
+            # TQ capacité max non atteinte
+            while j < n and capacityleft > 0:
+                # generer un indice aleatoire
+                index = np.random.randint(0, n - 1)
+                # calculer le nombre maximale d'exemplaires qu'on peut rajouter
+                maxQuantity = int(capacityleft / weight[index]) + 1
+                if maxQuantity == 0:
+                    nbItems = 0
+                else:  # si maxQuantity>0 generer un nombre aleatoire d'exemplaires inferieurs a maxQuantity
+                    nbItems = np.random.randint(0, maxQuantity)
+                sol[index] = nbItems
+                capacityleft = capacityleft - weight[index] * sol[index]
+                j = j + 1
+
+            gain_out = 0  # calculer le gain obtenu
+            for i in range(n):
+                gain_out = gain_out + profits[i] * sol[i]
+
+            return gain_out, capacityleft, sol
+
+
+        # convertir une solution binaire en une solution en n
+        def binaryToNsolution(solution, tab_max_nb):
+            solN = []
+            indMin = 0
+            for i in range(len(tab_max_nb)):
+                indMax = indMin + tab_max_nb[i]
+                solN.append(sum(solution[indMin:indMax]))
+                indMin = indMax
+            return solN
+
+
+        # la fonction principale du recuit simulé
+        def simulatedAnnealing(
+            itemsIn,
+            capacity,
+            solinit,
+            samplingSize,
+            temperatureInit,
+            coolingFactor,
+            endingTemperature,
+        ):
+
+            items = itemsIn.copy()
+            for i in range(len(items)):
+                items[i].append(solinit[i])
+            # trier objets par utilité
+            items_sorted = trier_objet_utility(items)
+            # reordonner la solution
+            solinitsorted = []
+            for i in range(len(items_sorted)):
+                solinitsorted.append(items_sorted[i][2])
+            # recupere le tabeau contenant le nombre max d'exemplaires de chaque objet
+            tab_max_nb, taille = get_max_number_item(items_sorted, capacity)
+            tab_poids_new = get_tab_poid_new(items_sorted, tab_max_nb)
+            tab_gain_new = get_tab_gain_new(items_sorted, tab_max_nb)
+            # convertir la solution en une solution binaire
+            solCurrent = ntobinary(solinitsorted, tab_max_nb)
+            # evaluer la solution
+            evalsol = eval_solution(solCurrent, tab_gain_new)
+            # recuperer la temperature initaile
+            temperature = temperatureInit
+            # initialiser la meilleur solution
+            bestSol = solCurrent.copy()
+            bestEval = evalsol
+            while temperature > endingTemperature:
+
+                for i in range(samplingSize):
+                    # passage a une nouvelle configuration
+                    solCurrent = getNextState(
+                        solCurrent, taille, tab_poids_new, tab_gain_new, capacity, temperature
+                    )
+                    # evaluer la nouvelle configuation
+                    evalCurrent = eval_solution(solCurrent, tab_gain_new)
+                    # si meilleur MAJ de la meilleur solution
+                    if evalCurrent > bestEval:
+                        bestSol = solCurrent.copy()
+                        bestEval = evalCurrent
+                # MAJ la temperature
+                temperature = cool(temperature, coolingFactor)
+
+            objects = []
+            solution = []
+            # convertir la solution binaire trouver en une solution en n
+            Nsol = binaryToNsolution(bestSol, tab_max_nb)
+            for i, item in enumerate(Nsol):
+                if item != 0:
+                    objects.append(items[i])
+                    solution.append(item)
+            poids = 0
+            for i, obj in enumerate(objects):
+                poids += obj[0] * solution[i]
+            # retourne la solution son gain et son poids
+            return objects, solution, Nsol, bestEval, poids
 
         """,
             language="python",
@@ -1484,40 +1907,53 @@ def main():
         st.subheader("Import data (Apply the algorithm on a signle file)")
 
         col1, col2, col3 = st.beta_columns(3)
+        colo1, colo2, colo3 = st.beta_columns(3)
+        random.seed(1)
+        param1 = col1.number_input("Insert param1", format="%d", value=5)
+        param2 = col2.number_input("Insert param2", format="%d", value=100)
+        param3 = col3.number_input("Insert param3", value=0.9)
+        param4 = col1.number_input("Insert param4", format="%d", value=5)
 
-        if col2.button("Upload file"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
-            #file_path = filedialog.askopenfilename(master=root)
-            file_path=easygui.fileopenbox()
+        col3.text("")
+        col3.text("")
+        if col3.button("Upload file"):
+            file_path = easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!")
                 n, w, v, b = read_data_3_single(file_path)
                 st.subheader("Solution")
+                capacity = w
                 start_time = time.time()
-                arr = np.array(heuristic_arrondi(b, v, w)[1])
+                sol = density_ordered_greedy_ukp(b, v, capacity)[1]
+                gain_out, capacityleft, sol = gen_random_sol(b, n, capacity)
+                objects, solution, Nsol, bestEval, poids = simulatedAnnealing(
+                    b, capacity, sol, param1, param2, param3, param4
+                )
                 dispTime = time.time()
-                pdarr = pd.DataFrame(arr, columns=["Number of elements"])
+                solution = np.array(solution)
+                pdarr = pd.DataFrame(solution, columns=["Number of elements"])
                 st.dataframe(pdarr.T)
 
                 st.text(
                     "Result :"
-                    + str(heuristic_arrondi(b, v, w)[2])
+                    + str(bestEval)
                     + " in (time): "
                     + str(dispTime - start_time)
                 )
-
-        st.subheader("Statistics")
-        instances = ([str(i) for i in range(5, 210, 5)], 3)
-        stats(instances, "hr")
+        colo1, colo2 = st.beta_columns((2, 1))
+        colo2.text("")
+        colo1.subheader("Time results")
+        colo1.text("")
+        if colo2.button("Select instances directory"):
+            dir_path = easygui.diropenbox()
+            if dir_path != "":
+                stats(dir_path, "rs")
 
     elif page == "Genetic Algorithm":
         st.title("Genetic Algorithm")
         st.subheader("Description")
         st.write(
-            "This approach involves sorting objects in ascending or descending order of their weight (or volumes). The list of objects thus sorted is scanned and for each type of object, we take as many copies of the latter as possible and so on until the complete scan of the list of objects. This heuristic very seldom gives good results. Often, it is better to sort objects according to the descending order of their weight because usually objects, with small weights, have a small gain"
+            "Genetic algorithms belong to the family of evolutionary algorithms. Their goal is to obtain an approximate solution to an optimization problem, when there is no exact method (or the solution is unknown) to solve it in a reasonable time. Genetic algorithms use the notion of natural selection and apply it to a population of potential solutions to the given problem. The solution is approached by successive «bonds», as in a procedure of separation and evaluation (branch & bound), except that these are formulas that are sought and no longer directly values."
         )
 
         st.subheader("Algorithm")
@@ -1673,22 +2109,22 @@ def main():
         col1, col2, col3 = st.beta_columns(3)
         colo1, colo2, colo3 = st.beta_columns(3)
         random.seed(1)
-        max_it = col1.number_input("Insert a max_it", format="%d", value=0)
-        max_n = col2.number_input("Insert a max_n", format="%d", value=0)
-        N = col3.number_input("Insert a n", format="%d", value=0)
-        NI = col1.number_input("Insert a ni", format="%d", value=0)
-        Pc = col2.number_input("Insert a pc")
-        Pm = col3.number_input("Insert a pm")
+        max_it = col1.number_input("Insert a max_it", format="%d", value=500)
+        max_n = col2.number_input("Insert a max_n", format="%d", value=10)
+        N = col3.number_input("Insert a n", format="%d", value=2500)
+        NI = col1.number_input("Insert a ni", format="%d", value=100)
+        Pc = col2.number_input("Insert a pc",value=0.6)
+        Pm = col3.number_input("Insert a pm",value=0.4)
         stagnation = col1.checkbox("stagnation")
 
         if col3.button("Upload file"):
 
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
-            #file_path = filedialog.askopenfilename(master=root)
-            file_path=easygui.fileopenbox()
+            # root = tk.Tk()
+            # root.focus_get()
+            # root.withdraw()
+            # root.focus_force()
+            # file_path = filedialog.askopenfilename(master=root)
+            file_path = easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!")
                 n, w, v, b = read_data_3_single(file_path)
@@ -1713,16 +2149,16 @@ def main():
 
         colo1, colo2 = st.beta_columns((2, 1))
         colo2.text("")
-        colo1.subheader("Time Comparaison")
+        colo1.subheader("Time results")
         colo1.text("")
         if colo2.button("Select instances directory"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
+            # root = tk.Tk()
+            # root.focus_get()
+            # root.withdraw()
+            # root.focus_force()
 
-            #dir_path = filedialog.askdirectory(master=root)
-            dir_path=easygui.diropenbox()
+            # dir_path = filedialog.askdirectory(master=root)
+            dir_path = easygui.diropenbox()
             if dir_path != "":
                 stats(dir_path, "ag")
 
@@ -1738,48 +2174,35 @@ def main():
         st.code(
             """
                 class AntColony:
-                    def __init__(
-                        self,
-                        benifices,
-                        poids,
-                        utilites,
-                        n_objets,
-                        W,
-                        densitySol,
-                        n_ants,
-                        n_best,
-                        n_iterations,
-                        decay,
-                        alpha=1,
-                        beta=1,
-                    ):
+
+                    def __init__(self,benifices,poids, utilites,n_objets, W,densitySol,n_ants, n_best, n_iterations, decay, alpha=1, beta=1):
                         
                         #Args:
-                            # benifices (1D numpy.array): Les benifices de chaque objet.
-                            # poids (1D numpy.array): Les poids de chaque objet.
-                            # poids (1D numpy.array): L'utilité d'un objet de chaque objet.
-                            # n_objets (int): Nombre d'objets
-                            # W (int): La capacité du sac
-                            # densitySol (liste): Solution generé par heuristique spécifique
-                            # n_ants (int): Nombre de fourmis par iterations
-                            # n_best (int): Nombre de meilleures fourmis qui déposent le pheromone
-                            # n_iteration (int): nombre d'iteration
-                            # decay (float): 1-Taux d'evaporation de pheromone
-                            # alpha (int or float): Exposant dans le pheromone, Alpha grand donne plus de poid au pheromone
-                            # beta (int or float): Exposant sur l'utilité, Beta grand donne plus de poid a l'utilité
-                        # Example:
-                            # ant_colony = AntColony(benifices,poids, utilites,n_objets, W,densitySol,n_ants, n_best, n_iterations, decay, alpha=1, beta=2)
-                      
-                        self.utilites = utilites
-                        self.W = W
-                        self.n_objets = n_objets
-                        self.poids = poids
-                        self.benifices = benifices
+                            #benifices (1D numpy.array): Les benifices de chaque objet.
+                            #poids (1D numpy.array): Les poids de chaque objet.
+                            #poids (1D numpy.array): L'utilité d'un objet de chaque objet.
+                            #n_objets (int): Nombre d'objets
+                            #W (int): La capacité du sac
+                            #densitySol (liste): Solution generé par heuristique spécifique
+                            #n_ants (int): Nombre de fourmis par iterations
+                            #n_best (int): Nombre de meilleures fourmis qui déposent le pheromone
+                            #n_iteration (int): nombre d'iteration
+                            #decay (float): 1-Taux d'evaporation de pheromone
+                            #alpha (int or float): Exposant dans le pheromone, Alpha grand donne plus de poid au pheromone
+                            #beta (int or float): Exposant sur l'utilité, Beta grand donne plus de poid a l'utilité
+                        #Example:
+                            #ant_colony = AntColony(benifices,poids, utilites,n_objets, W,densitySol,n_ants, n_best, n_iterations, decay, alpha=1, beta=2)         
+                        
+                        self.utilites  = utilites
+                        self.W=W
+                        self.n_objets=n_objets
+                        self.poids=poids
+                        self.benifices=benifices
                         self.pheromone = np.ones(n_objets)
-                        # ajouter du pheromone au objets generé par heuristique
-                        for i, s in enumerate(densitySol):
-                            if s > 0:
-                                self.pheromone[i] += s * 0.1
+                        #ajouter du pheromone au objets generé par heuristique
+                        for i,s in enumerate(densitySol):
+                        if s>0:
+                            self.pheromone[i]+=s*0.1
                         self.all_inds = range(len(utilites))
                         self.n_ants = n_ants
                         self.n_best = n_best
@@ -1788,181 +2211,188 @@ def main():
                         self.alpha = alpha
                         self.beta = beta
 
-                    def run(self, n_candidats, densitySol):
+                    
+
+                    def run(self,n_candidats,densitySol):
                         
-                        # Args:
-                            # n_candidats (int): Nombre de candidats pour construire les solutions
-                            # densitySol (Gain:int,sol:liste,Poid:int): Solution generé par heuristique spécifique
-                        # Example:
-                            # best_sol = ant_colony.run(n_candidats,densitySol)
+                        #Args:
+                            #n_candidats (int): Nombre de candidats pour construire les solutions
+                            #densitySol (Gain:int,sol:liste,Poid:int): Solution generé par heuristique spécifique
+                        #Example:
+                            #best_sol = ant_colony.run(n_candidats,densitySol)         
                         
-                        best_solution = (densitySol[1], densitySol[0], densitySol[2])
-                        best_solution_all_time = (densitySol[1], densitySol[0], densitySol[2])
+                        best_solution = (densitySol[1], densitySol[0],densitySol[2])
+                        best_solution_all_time = (densitySol[1], densitySol[0],densitySol[2])
                         for i in range(self.n_iterations):
-                            # generer toutes les solutions par les fourmis
+                            #generer toutes les solutions par les fourmis 
                             all_solutions = self.gen_all_solutions(n_candidats)
-                            # mise a jours des pistes pheromones
-                            self.spread_pheronome(
-                                all_solutions, self.n_best, best_solution=best_solution
-                            )
-                            # Choisir meilleure solution dans l'iteration actuelle
+                            #mise a jours des pistes pheromones
+                            self.spread_pheronome(all_solutions, self.n_best, best_solution=best_solution)
+                            #Choisir meilleure solution dans l'iteration actuelle
                             best_solution = max(all_solutions, key=lambda x: x[1])
-                            # print (best_solution)
-                            # Mettre a jour la meilleure solution globale
+                            #print (best_solution)
+                            #Mettre a jour la meilleure solution globale 
                             if best_solution[1] > best_solution_all_time[1]:
-                                best_solution_all_time = best_solution
-                            # evaporation de pheromone
-                            self.pheromone = self.pheromone * self.decay
-                            self.pheromone[self.pheromone < 1] = 1
-
-                        print(self.gen_sol_gain(best_solution_all_time[0]))
-                        print(self.gen_path_poid(best_solution_all_time[0]))
+                                best_solution_all_time = best_solution  
+                                
+                            #evaporation de pheromone            
+                            self.pheromone= self.pheromone * self.decay
+                            self.pheromone[self.pheromone<1]=1   
+                            
+                        print(self.gen_sol_gain(best_solution_all_time[0]) )  
+                        print(self.gen_path_poid(best_solution_all_time[0]) )          
                         return best_solution_all_time
-
+                    
+                
                     def spread_pheronome(self, solutions, n_best, best_solution):
-                        
-                        # Dépose le pheromone sur les n_best meilleures solutions
-
-                        
-                        sorted_solution = sorted(solutions, key=lambda x: x[1], reverse=True)
-                        for sol, gain, poid in sorted_solution[:n_best]:
+                    
+                        #Dépose le pheromone sur les n_best meilleures solutions
+                            
+                    sorted_solution = sorted(solutions, key=lambda x: x[1],reverse=True)
+                    for sol, gain,poid in sorted_solution[:n_best]:
                             for i in sol:
-                                self.pheromone += 0.00001 * gain
+                            self.pheromone+= 0.00001*gain
+                            
 
                     def gen_sol_gain(self, sol):
-                       
-                        # Calcul le gain d'une solution.
-                        # Pas necessaire mais peut servir à verifier les résultats (test unitaire)
-
-                        
-                        total_fitness = 0
-                        for i, ele in enumerate(sol):
-                            total_fitness += self.benifices[i] * ele
-                        return total_fitness
+                    
+                        #Calcul le gain d'une solution.
+                        #Pas necessaire mais peut servir à verifier les résultats (test unitaire)
+                            
+                    
+                    total_fitness = 0
+                    for i,ele in enumerate(sol):
+                            total_fitness += self.benifices[i]*ele
+                    return total_fitness
 
                     def gen_path_poid(self, sol):
-                       
-                        # Calcul le poid d'une solutions.
-                        # Pas necessaire mais peut servir à verifier les résultats (test unitaire)
+                    
+                        #Calcul le poid d'une solutions.
+                        #Pas necessaire mais peut servir à verifier les résultats (test unitaire)
+                            
+                    
+                    total_fitness = 0
+                    for i,ele in enumerate(sol):
+                            total_fitness += self.poids[i]*ele
+                    return total_fitness
 
-                       
-                        total_fitness = 0
-                        for i, ele in enumerate(sol):
-                            total_fitness += self.poids[i] * ele
-                        return total_fitness
 
-                    def gen_all_solutions(self, n_candidats):
+
+                    def gen_all_solutions(self,n_candidats):
                         
-                        # Generer toutes les solutions par les fourmis
-
+                        #Generer toutes les solutions par les fourmis
+                            
                         
                         all_solutions = []
                         for i in range(self.n_ants):
-                            # Positionner la fourmis sur un objets de départ aleatoirement
-                            n = rn.randint(0, self.n_objets - 1)
-                            # generation de la solution par la fourmis en utilisant n_candidats
-                            solution = self.gen_sol(n, n_candidats)
-
-                            # ajouter la solution a la liste de toute les solutions
-                            all_solutions.append((solution[0], solution[1], solution[2]))
+                        #Positionner la fourmis sur un objets de départ aleatoirement
+                        n=rn.randint(0,self.n_objets-1)
+                        #generation de la solution par la fourmis en utilisant n_candidats
+                        solution = self.gen_sol(n,n_candidats)
+                        
+                        #ajouter la solution a la liste de toute les solutions
+                        all_solutions.append((solution[0], solution[1], solution[2]))
                         return all_solutions
 
-                    def listeCandidate(self, phero, visited, n_candidats):
+
+                    def listeCandidate(self,phero,visited,n_candidats):
+                    
+                        #retourne La liste des candidats pour une solution
+                            
+                    
+                    pheromone=phero.copy()
+                    
+                    pheromone[list(visited)]= 0
+                    #rn.choices returns a list with the randomly selected element from the list.
+                    #weights to affect a probability for each element
+                    
+                    c=rn.choices(self.all_inds,weights=[p for p in pheromone],k=n_candidats)
+                    c=list(set(c))
+                    i=len(c)
+                    #while i<n_candidats:
+                        #n=rn.randint(0,self.n_objets-1)
+                        #if n not in visited:
+                            #c.append(n)
+                            #i+=1
+                    nb_candidats=len(c)
+                    
+                    return c ,pheromone
+
+
+                    #generer solution c'est bon
+                    def gen_sol(self, start,n_candidats):
                         
-                        # retourne La liste des candidats pour une solution
-
-                        
-                        pheromone = phero.copy()
-
-                        pheromone[list(visited)] = 0
-                        # rn.choices returns a list with the randomly selected element from the list.
-                        # weights to affect a probability for each element
-                        c = rn.choices(self.all_inds, weights=[p for p in pheromone], k=n_candidats)
-                        i = len(c)
-                        while i < n_candidats:
-                            n = rn.randint(0, self.n_objets - 1)
-                            if n not in visited:
-                                c.append(n)
-                                i += 1
-
-                        return c, pheromone
-
-                    # generer solution c'est bon
-                    def gen_sol(self, start, n_candidats):
-                       
-                        # Construit la solution avec n_candidats et start comme premier objet
-
+                        #Construit la solution avec n_candidats et start comme premier objet
+                            
                         
                         sol = np.zeros(self.n_objets)
-                        poidrestant = self.W
-                        visited = set()  # liste des objets visité
-                        # ajouter le premier objet
-                        r = rn.randint(1, poidrestant // poids[start])
-                        sol[start] = r
-                        poidrestant -= poids[start] * r
-                        gain = r * benifices[start]
-                        visited.add(start)  # ajouter le debut a la liste civité
-
-                        # la liste candidates avec les pheromones mis a jours localement (0 sur les visited)
-                        candidats, pheromones = self.listeCandidate(
-                            self.pheromone, visited, n_candidats
-                        )
-
-                        for i in candidats:
-                            # Choisir le prochain objets parmi les candidats ainsi que le nombre
-                            move, nb = self.pick_move(
-                                pheromones, candidats, n_candidats, self.utilites, visited
-                            )
-                            candidats.pop(candidats.index(move))
-                            pheromones[
-                                move
-                            ] = 0  # rendre le pheromone à 0 pour indiquer qu'il a été visité
-
-                            # Mise a jour poidRestant et gain de la solution
-                            poidrestant -= poids[move] * nb
+                        poidrestant=self.W
+                        visited = set()#liste des objets visité
+                        #ajouter le premier objet
+                        r=rn.randint(1,poidrestant//poids[start])
+                        sol[start]=r
+                        poidrestant-=poids[start]*r
+                        gain=r*benifices[start]
+                        visited.add(start)#ajouter le debut a la liste civité
+                        
+                        #la liste candidates avec les pheromones mis a jours localement (0 sur les visited)
+                        candidats,pheromones=self.listeCandidate(self.pheromone,visited,n_candidats)
+                        
+                        for i in candidats :
+                            #Choisir le prochain objets parmi les candidats ainsi que le nombre
+                            move,nb = self.pick_move(pheromones, candidats,n_candidats,self.utilites, visited)
+                            toPop=candidats.index(move)
+                            candidats.pop(toPop)
+                            n_candidats-=1
+                            np.delete(pheromones,toPop)#rendre le pheromone à 0 pour indiquer qu'il a été visité
+                        
+                            
+                            
+                            #Mise a jour poidRestant et gain de la solution
+                            poidrestant-=poids[move]*nb
                             while poidrestant < 0:
-                                nb -= 1
-                                poidrestant += poids[move]
-
-                            sol[move] = nb
-                            gain += nb * benifices[move]
-
-                            # ajouter l'objet a visited
-                            visited.add(move)
-
-                        return sol, gain, self.W - poidrestant
-
-                    def pick_move(self, pheromone, liste_cand, n_candidats, utilite, visited):
-                        pheromone = pheromone.copy()[liste_cand]
-                        # generer le regle de déplacement sur les candidat
-                        numerateurs = (pheromone ** self.alpha) * (
-                            (1.0 / (utilite[liste_cand])) ** self.beta
-                        )
-
-                        # formule vu en cours
-                        P = numerateurs / numerateurs.sum()
-                        # choisir l'objet suivant en utilisant les probabilité P
-                        move = np_choice(liste_cand, 1, p=P)[0]
-                        # nombre d'objet a prendre
-                        nb = self.W // self.poids[move]
-                        # nb=rn.randint(0,self.W//self.poids[move])
-
-                        return (move, nb)
-
-
+                            nb-=1
+                            poidrestant+=poids[move]
+                            
+                            sol[move]=nb
+                            gain+=nb*benifices[move]
+                            
+                            #ajouter l'objet a visited
+                            visited.add(move)  
+                        #print("s",i,sol,gain)
+                        return sol,gain,self.W-poidrestant
+                    
+                    def pick_move(self, pheromone,liste_cand, n_candidats, utilite, visited):
+                        
+                        pheromone=pheromone.copy()[liste_cand]
+                    #generer le regle de déplacement sur les candidat
+                        numerateurs=(pheromone**self.alpha)* (( 1.0 / (utilite[liste_cand]))**self.beta)
+                        
+                    #formule vu en cours
+                        
+                        P = (numerateurs / numerateurs.sum())
+                        
+                        #choisir l'objet suivant en utilisant les probabilité P
+                        move = np_choice(liste_cand, 1, p=P)[0] 
+                        #nombre d'objet a prendre
+                        nb=self.W//self.poids[move]
+                        #nb=rn.randint(0,self.W//self.poids[move])
+                    
+                        return (move,nb)
+                    
                 def density_ordered_greedy_ukp(b, v, w):
-                    d = [(b[i] / v[i], i) for i in range(len(v))]
-                    d.sort(key=lambda x: x[0], reverse=True)
+                    d = [(b[i]/v[i],i) for i in range(len(v))]
+                    d.sort(key=lambda x:x[0], reverse = True)
                     M = 0
                     res = [0 for _ in range(len(d))]
                     for i in range(len(d)):
-                        if w == 0:
+                        if w==0:
                             break
-                        nb = int(w / v[d[i][1]])
+                        nb = int(w/v[d[i][1]])
                         M += nb * b[d[i][1]]
                         w -= nb * v[d[i][1]]
                         res[d[i][1]] = nb
-                    return M, res, w
+                    return M,res,w  
 
             """,
             language="python",
@@ -1971,19 +2401,14 @@ def main():
         st.subheader("Import data (Apply the algorithm on a signle file)")
         col1, col2, col3 = st.beta_columns(3)
 
-        n_ants = col1.number_input("Insert a n_ants", format="%d", value=0)
-        n_best = col2.number_input("Insert a n_best", format="%d", value=0)
-        n_iterations = col3.number_input("Insert a n_iterations", format="%d", value=0)
-        decay = col1.number_input("Insert a decay")
-        alpha = col2.number_input("Insert a alpha", format="%d", value=0)
-        beta = col3.number_input("Insert a beta", format="%d", value=0)
+        n_ants = col1.number_input("Insert a n_ants", format="%d", value=100)
+        n_best = col2.number_input("Insert a n_best", format="%d", value=10)
+        n_iterations = col3.number_input("Insert a n_iterations", format="%d", value=10)
+        decay = col1.number_input("Insert a decay",value=0.8)
+        alpha = col2.number_input("Insert a alpha", format="%d", value=1)
+        beta = col3.number_input("Insert a beta", format="%d", value=2)
         if col2.button("Upload file"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
-            #file_path = filedialog.askopenfilename(master=root)
-            file_path=easygui.fileopenbox()
+            file_path = easygui.fileopenbox()
             if file_path != "":
                 st.text("imported !!")
                 n, w, v, b = read_data_3_single(file_path)
@@ -2024,28 +2449,25 @@ def main():
                 )
         colo1, colo2 = st.beta_columns((2, 1))
         colo2.text("")
-        colo1.subheader("Time Comparaison")
+        colo1.subheader("Time results")
         colo1.text("")
         if colo2.button("Select instances directory"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
+            # root = tk.Tk()
+            # root.focus_get()
+            # root.withdraw()
+            # root.focus_force()
 
-            #dir_path = filedialog.askdirectory(master=root)
-            dir_path=easygui.diropenbox()
+            # dir_path = filedialog.askdirectory(master=root)
+            dir_path = easygui.diropenbox()
             if dir_path != "":
                 stats(dir_path, "ac")
 
     else:
-
         st.title("Comparaison")
+        st.text("")
+        colo1, colo2 = st.beta_columns((3, 5))
 
-        col1, col2 = st.beta_columns((2, 1))
-        col2.text("")
-
-        colo1, colo2 = st.beta_columns((2, 5))
-        colo1.text("Select methods to compare time:")
+        colo1.text("Select methods to compare time and gain:")
         bbcheck = colo2.checkbox("Branch and Bound")
         dpcheck = colo2.checkbox("Dynamic Programing")
         dogcheck = colo2.checkbox("Density Ordered Greedy")
@@ -2054,14 +2476,43 @@ def main():
         hrcheck = colo2.checkbox("Heuristic By Rounding")
         agcheck = colo2.checkbox("Genetic Algorithm")
         accheck = colo2.checkbox("Ant colony")
-        if col2.button("Select instances directory"):
-            #root = tk.Tk()
-            #root.focus_get()
-            #root.withdraw()
-            #root.focus_force()
+        rscheck = colo2.checkbox("Recuit simulé")
+        if agcheck:
 
-            #dir_path = filedialog.askdirectory(master=root)
-            dir_path=easygui.diropenbox()
+            random.seed(1)
+            st.subheader("Genetic Algorithm Parameters")
+            co1, co2, co3 = st.beta_columns(3)
+
+            max_it = co1.number_input("Insert max it", format="%d", value=500)
+            max_n = co2.number_input("Insert max_n", format="%d", value=10)
+            N = co3.number_input("Insert n", format="%d", value=2500)
+            NI = co1.number_input("Insert ni", format="%d", value=100)
+            Pc = co2.number_input("Insert pc",value=0.6)
+            Pm = co3.number_input("Insert pm",value=0.4)
+            stagnation = co1.checkbox("Stagnation")
+
+        if accheck:
+            st.subheader("Ant Colony Parameters")
+            c1, c2, c3 = st.beta_columns(3)
+
+            n_ants = c1.number_input("Insert n_ants", format="%d", value=100)
+            n_best = c2.number_input("Insert n_best", format="%d", value=10)
+            n_iterations = c3.number_input("Insert n_iterations", format="%d", value=10)
+            decay = c1.number_input("Insert decay",value=0.8)
+            alpha = c2.number_input("Insert alpha", format="%d", value=1)
+            beta = c3.number_input("Insert beta", format="%d", value=2)
+        if rscheck:
+            st.subheader("Recuit simulé Parameters")
+            cl1, cl2, cl3 = st.beta_columns(3)
+            param1 = cl1.number_input("Insert param1", format="%d", value=5)
+            param2 = cl2.number_input("Insert param2", format="%d", value=100)
+            param3 = cl3.number_input("Insert param3", value=0.9)
+            param4 = cl1.number_input("Insert param4", format="%d", value=5)
+
+        col1, col2, col3 = st.beta_columns(3)
+        if col3.button("Select instances directory"):
+
+            dir_path = easygui.diropenbox()
             if dir_path != "":
 
                 st.subheader("Time Comparaison")
@@ -2077,25 +2528,8 @@ def main():
                     hrcheck,
                     agcheck,
                     accheck,
+                    rscheck,
                 )
-                st.text("")
-                st.text("")
-                st.subheader("Gain comparaison")
-                st.text("")
-                st.text("")
-                statsCompGain(
-                    dir_path,
-                    bbcheck,
-                    dpcheck,
-                    dogcheck,
-                    wdogTcheck,
-                    wdogFcheck,
-                    hrcheck,
-                    agcheck,
-                    accheck,
-                )
-
-        #
 
 
 ################################################################
