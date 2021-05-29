@@ -33,6 +33,10 @@ n_iterations = 10
 decay = 0.8
 alpha = 1
 beta = 2
+param1=1000
+param2=5
+param3=0.9
+param4=5
 ######################### Recuit simulé ########################
 # Mise a jour de la temperature
 def cool(temprature, coolingFactor):
@@ -852,7 +856,7 @@ def weighted_ordered_greedy_ukp(b, v, w, ordre_croissant=False):
         M += nb * b[d[i][1]]
         w -= nb * v[d[i][1]]
         res[d[i][1]] = nb
-    return M, res
+    return M, res, w
 
 
 #######################################################
@@ -900,10 +904,12 @@ def stats(dir_path, meth):
         #############################################
         if meth == "rs":
             start_time = time.time()
+            data= pd.DataFrame(list(zip(v,b)))
+            items_init=data.values.tolist()
             sol = density_ordered_greedy_ukp(b, v, w)[1]
-            gain_out, capacityleft, sol = gen_random_sol(b, n, w)
+            gain_out, capacityleft, sol = gen_random_sol(items_init, n, w)
             objects, solution, Nsol, bestEval, poids = simulatedAnnealing(
-                b, w, sol, 5, 1000, 0.9, 5
+                items_init, w, sol, param1, param2, param3, param4
             )
             gain.append(bestEval)
         if meth == "bb":
@@ -933,11 +939,7 @@ def stats(dir_path, meth):
             densitySol = density_ordered_greedy_ukp(b, v, w)
             benifices = np.array(b)
             poids = np.array(v)
-            utilites = poids / benifices
-            n_ants = 100
-            n_best = 10
-            n_iterations = 10
-            decay = 0.8
+            utilites = poids / benifices         
 
             colony = AntColony(
                 benifices,
@@ -1019,6 +1021,7 @@ def statsComp(
         [],
         [],
         [],
+        []
     )
 
     (
@@ -1040,6 +1043,7 @@ def statsComp(
         [],
         [],
         [],
+        []
     )
     files = dir_files(dir_path)
     for file in files:
@@ -1049,10 +1053,12 @@ def statsComp(
         #############################################
         if rscheck:
             start_time = time.time()
+            data= pd.DataFrame(list(zip(v,b)))
+            items_init=data.values.tolist()
             sol = density_ordered_greedy_ukp(b, v, w)[1]
-            gain_out, capacityleft, sol = gen_random_sol(b, n, w)
+            gain_out, capacityleft, sol = gen_random_sol(items_init, n, w)
             objects, solution, Nsol, bestEval, poids = simulatedAnnealing(
-                b, w, sol, 5, 1000, 0.9, 5
+                items_init, w, sol, param1, param2, param3, param4
             )
             time_rs.append(time.time() - start_time)
             gain_rs.append(bestEval)
@@ -1130,9 +1136,9 @@ def statsComp(
     if dogcheck:
         df["Density Ordered Greedy"] = time_dog
     if wdogTcheck:
-        df["Weighted Ordered Greedy (true)"] = time_wdogT
+        df["Weighted Ordered Greedy (asc)"] = time_wdogT
     if wdogFcheck:
-        df["Weighted Ordered Greedy (false)"] = time_wdogF
+        df["Weighted Ordered Greedy (desc)"] = time_wdogF
     if hrcheck:
         df["Heuristic By Rounding"] = time_hr
     if agcheck:
@@ -1162,9 +1168,9 @@ def statsComp(
     if dogcheck:
         df1["Density Ordered Greedy"] = gain_dog
     if wdogTcheck:
-        df1["Weighted Ordered Greedy (true)"] = gain_wdogT
+        df1["Weighted Ordered Greedy (asc)"] = gain_wdogT
     if wdogFcheck:
-        df1["Weighted Ordered Greedy (false)"] = gain_wdogF
+        df1["Weighted Ordered Greedy (desc)"] = gain_wdogF
     if hrcheck:
         df1["Heuristic By Rounding"] = gain_hr
     if agcheck:
@@ -1172,7 +1178,7 @@ def statsComp(
     if accheck:
         df1["Ant colony"] = gain_ac
     if rscheck:
-        df["Recuit simulé"] = gain_rs
+        df1["Recuit simulé"] = gain_rs
 
     df1 = df1.rename(columns={"ojt": "index"}).set_index("index")
     chart1 = st.line_chart(df1)
@@ -1207,27 +1213,31 @@ def main():
         st.write(
             " The knapsack problem is a problem in combinatorial optimization: Given a set of items, each with a weight and a value, determine the number of each item to include in a collection so  that the total weight is less than or equal to a given limit and the total value is as large as possible. It derives its name from the problem faced by someone who is constrained by a fixed-size knapsack and must fill it with the most valuable items. The problem often arises in resource allocation where the decision makers have to choose from a set of non-divisible projects or tasks under a fixed budget or time constraint, respectively"
         )
-
         st.title("Description")
-        st.components.v1.html(
-            """
-        <div><p style="color:white">
-
-        ...
-  </p> </div>
-        """,
-            width=600,
-        )
+        st.write("The most common problem being solved is the 0-1 knapsack problem, which restricts the number xi of copies of each kind of item to zero or one. Given a set of n items numbered from 1 up to n, each with a weight wi and a value vi, along with a maximum weight capacity W,")
+        st.latex("maximize \: {\displaystyle \sum _{i=1}^{n}v_{i}x_{i}}")
+        st.latex("subject \; \: to  \: {\displaystyle \sum _{i=1}^{n}w_{i}x_{i}\leq W}  \: and  \: {\displaystyle x_{i}\in \{0,1\}}.")
+        st.write("Here xi represents the number of instances of item i to include in the knapsack. Informally, the problem is to maximize the sum of the values of the items in the knapsack so that the sum of the weights is less than or equal to the knapsack's capacity.")
+        st.write("The bounded knapsack problem (BKP) removes the restriction that there is only one of each item, but restricts the number xi of copies of each kind of item to a maximum non-negative integer value c:")
+        st.latex("maximize \: {\displaystyle \sum _{i=1}^{n}v_{i}x_{i}}")
+        st.latex("subject \; \: to  \:{\displaystyle \sum _{i=1}^{n}w_{i}x_{i}\leq W}  \: and  \: {\displaystyle x_{i}\in \{0,1,2,...,c\}}.")
+        st.write("The unbounded knapsack problem (UKP) places no upper bound on the number of copies of each kind of item and can be formulated as above except for that the only restriction on xi is that it is a non-negative integer.")
+        st.latex("maximize \: {\displaystyle \sum _{i=1}^{n}v_{i}x_{i}}")
+        st.latex("subject \; \: to  \: {\displaystyle \sum _{i=1}^{n}w_{i}x_{i}\leq W} \; and \; {\displaystyle x_{i}\geq 0,\ x_{i}\in \mathbb {Z} .}")
         st.title("Methodes")
-        st.components.v1.html(
-            """
-        <div><p style="color:white">
+       
+        st.write("\t \t - Branch and Bound")
+        st.write("\t \t - Dynamic Programing")
+        st.write("\t \t - Density Ordered Greedy")
+        st.write("\t \t - Weighted Ordered Greedy")
+        st.write("\t \t - Heuristic By Rounding")
+        st.write("\t \t - Recuit simulé")
+        st.write("\t \t - Genetic Algorithm")
+        st.write("\t \t - Ant colony")
+            
+   
+       
 
-        ...
-  </p> </div>
-        """,
-            width=600,
-        )
 
     elif page == "Branch and Bound":
         st.title("Branch and Bound Algorithm")
@@ -1239,48 +1249,107 @@ def main():
 
         st.code(
             """
-            class noeud:
+           class noeud:
                 def __init__(self, objet, val, pere, poids, m):
+                    #objet : ID de l'objet et qui correspond aussi au niveau du nœud dans l'arborescence
                     self.objet = objet
+                    #val : nombre d'exemplaires pris pour cet objet 
                     self.val = val
+                    #pere : pointeur vers le nœud père. Lorsqu'on trouve une solution, on remonte 
+                    #en utilisant cet attribut jusqu'à arriver à la racine
                     self.pere = pere
+                    #poids : c'est le volume restant dans le sac à dos après l'ajout des "val" exemplaires
+                    #de l'objet "objet"
                     self.poids = poids
+                    #m : c'est le gain cumulé des objets dans le sac à dos jusqu'à cet objet
                     self.m = m
 
             def first_solution(d,b,v,w,racine):
+                #La première solution est trouvée grace à l'heuristique : Density Ordered Greedy
+                #La variable "M" stockera le gain de la solution proposée par cette heuristique
                 M = 0
                 n = racine
+                #On fait un parcours complet des objets
                 for i in range(len(d)):
+                    #Si la taille restante du sac à dos est égale à 0, on arrete le parcours
                     if w==0:
                         break
+                    #Sinon, s'il reste de l'espace dans le sac à dos : 
+                    #On calcule dans "nb" le nombre d'exemplaires possibles de l'objet d[i][1]
                     nb = int(w/v[d[i][1]])
+                    #On met à jour le gain "M" après l'ajout de "nb" exemplaires de l'objet d[i][1]
                     M += nb * b[d[i][1]]
+                    #On met à jour le poids restant dans le sac à dos "w"
                     w -= nb * v[d[i][1]]
+                    #On construit notre branche au fur à mesure, elle correspond à la branche la plus 
+                    #à droite dans l'arbre du branch and bound
                     n = noeud(i+1,nb,n,w,M)
+                #On retourne le gain du sac à dos et le nœud feuille qui nous permet de trouver tous
+                #les nœuds de la branche à la fin
                 return M,n
 
             def diviser(n,b,v,d):
+                #Trouver l'ID de l'objet qui suit l'objet du nœud "n"
                 ind = d[n.objet][1]
+                #Etant donné un nœud "n", on calcule dans "nb" combien d'exemplaires de l'objet suivant 
+                #sont possibles à mettre dans le sac à dos
                 nb = int(n.poids/v[ind])
+                #On retourne une liste de "nb+1" nœuds, le premier ajoute au sac à dos "nb" exemplaires
+                #le deuxième "nb-1" exemplaires et ainsi de suite jusqu'à le dernier qui n'ajoute rien
                 return [noeud(n.objet+1,i,n,n.poids-i*v[ind],n.m+i*b[ind]) for i in range(nb,-1,-1)]
 
             def evaluer(n,d):
                 if n.objet==len(d):
+                    #Si le nœud correspond à une feuille donc on retourne la solution exacte
+                    #qui se trouve dans l'attribut "m"
                     return n.m
+                #Sinon, on utilise la meme fonction d'évaluation du cours
                 return n.m+n.poids*d[n.objet][0]
 
             def branch_and_bound_ukp(b, v, w):
+                #Initialisation du nœud racine
                 racine = noeud(0,-1,None,w,0)
-                d = [(b[i]/v[i],i) for i in range(len(v))] #Densité
+                #Construction de la liste des densités (utilités des objets)
+                d = [(b[i]/v[i],i) for i in range(len(v))]
+                #Ordonner la liste des densités par ordre décroissant
                 d.sort(key=lambda x:x[0], reverse=True)
+                ############################
+                #Ce bloc permet de retourner une liste "min_w" tel que min_w[i] est le volume minimal 
+                #des objets de la sous liste d[i :: nb_objets]. Cette liste va nous servir dans 
+                #l'optimisation et l'anticipation de l'élagage dans certains cas
+                mini = v[d[-1][1]]
+                min_w = []
+                for i in range(len(d)-1,-1,-1):
+                    mini = min(mini, v[d[i][1]])
+                    min_w.insert(0, mini)
+                ############################
+                #Trouver une première solution. "M" c'est la borne inférieure et "res" c'est
+                #la solution actuelle
                 M,res = first_solution(d,b,v,w,racine)
+                #Initialisation de la liste "na", liste des nœuds actifs, avec le résulat de
+                #la séparation du nœud racine
                 na = diviser(racine,b,v,d)
+                #Tant qu'il y aura de nœuds actifs, on termine notre exploration de l'arbre
                 while len(na)!=0:
+                    #On récupère le premier nœud actif dans "n" (on prend le premier nœud pour 
+                    #assurer une exploration en profondeur de l'arbre)  
                     n = na.pop(0)
-                    if n.poids==0:
+                    #S'il y a aucun autre objet qui peut tenir dans le volume restant dans le 
+                    #sac à dos, alors on élage et on modifie la borne inférieure si notre branche
+                    #donne un résultat meilleur (on remarque l'utilisation de la liste "min_w" pour 
+                    #optimiser la vérification)
+                    if n.poids<min_w[n.objet-1]:
                         if n.m>M:
                             M = n.m
                             res = n
+                    #Dans le cas contraire, si l'évaluation de notre nœud donne une valeure inférieure
+                    #à "M" on élague. Sinon, on sépare le nœud et pour chaque nœud fils "f", si son 
+                    #évaluation peut améliorer la solution on le garde sinon on élague.
+                    #Si le nœud fils "f" est une feuille et en plus il améliore la solution courante, 
+                    #on le prend comme nouvelle solution.
+                    #PS : on remarque l'utilisation de la fonction python int() après chaque évaluation,
+                    #le but c'est de retourner une approximation à l'entier qui est juste inférieure à 
+                    #l'évaluation et ça nous permet d'élaguer le plutot possible. 
                     elif int(evaluer(n,d))>M:     
                         fils = diviser(n,b,v,d)
                         fils_retenus = []
@@ -1293,12 +1362,15 @@ def main():
                                 else:
                                     fils_retenus.append(f)
                         na = fils_retenus + na
+                #Remonter dans l'arborescence en utilisant l'attribut "pere" afin de retourner
+                #la solution exacte trouvée
                 sol = [0 for _ in range(len(b))]
                 M = res.m
                 while res.val!=-1:
                     sol[d[res.objet-1][1]] = res.val
                     res = res.pere
                 return M,sol
+                
         """,
             language="python",
         )
@@ -1312,8 +1384,9 @@ def main():
 
             # file_path = filedialog.askopenfilename(master=root)
             file_path = easygui.fileopenbox()
+            
             if file_path != "":
-                st.text("imported !!" + file_path)
+                st.text("File imported !")
                 n, w, v, b = read_data_3_single(file_path)
                 st.subheader("Solution")
                 start_time = time.time()
@@ -1321,7 +1394,18 @@ def main():
 
                 arr = np.array(arr)
                 dispTime = time.time()
-                pdarr = pd.DataFrame(arr, columns=["Number of elements"])
+                #######################################################################
+                objectIDs = []
+                nbObjects = []
+                for i in range(1,len(arr)+1):
+                	if arr[i-1]!=0:
+                		objectIDs.append(i)
+                		nbObjects.append(arr[i-1])
+                arr = {'Object ID': np.array(objectIDs), "Number of elements": np.array(nbObjects)}
+                pdarr = pd.DataFrame(data=arr)
+                #########################################
+
+                ###pdarr = pd.DataFrame(arr, columns=["Number of elements"])
                 st.dataframe(pdarr.T)
 
                 st.text(
@@ -1353,6 +1437,7 @@ def main():
 
         st.code(
             """
+          def dp_ukp(w,n,b,v):
             # k contient le gain maximal associé aux poids allant de 0 à w (poids max)
             k=[0 for i in range(w+1)]
             
@@ -1370,7 +1455,7 @@ def main():
                                 items[wi].append(items[wi-v[j]][l])
                             items[wi].append(j+1) 
                             # donc la liste des objets pris est la liste des objets de items[wi-wt[j] en plus de l'objet j ajouté
-            return k[w]
+            return k[w],items[w]
         """,
             language="python",
         )
@@ -1384,18 +1469,31 @@ def main():
             # file_path = filedialog.askopenfilename(master=root)
             file_path = easygui.fileopenbox()
             if file_path != "":
-                st.text("imported !!")
+                st.text("File imported !")
                 n, w, v, b = read_data_3_single(file_path)
                 st.subheader("Solution")
                 start_time = time.time()
-                arr = np.array(dp_ukp(w, n, b, v)[1])
+                res,arr =dp_ukp(w, n, b, v)
+                arr = np.array(arr)
                 dispTime = time.time()
-                pdarr = pd.DataFrame(arr, columns=["Number of elements"])
+                #######################################################################
+                objectIDs = [arr[0]]
+                nbObjects = [1]
+                for i in range(1,len(arr)):
+                	if arr[i]==arr[i-1]:
+                		nbObjects[-1] += 1
+                	else:
+                		objectIDs.append(arr[i])
+                		nbObjects.append(1)
+                arr = {'Object ID': np.array(objectIDs), "Number of elements": np.array(nbObjects)}
+                
+                pdarr = pd.DataFrame(data=arr)
+                #pdarr = pd.DataFrame(arr, columns=["Number of elements"])
                 st.dataframe(pdarr.T)
 
                 st.text(
                     "Result :"
-                    + str(dp_ukp(w, n, b, v)[0])
+                    + str(res)
                     + " in (time): "
                     + str(dispTime - start_time)
                 )
@@ -1425,19 +1523,33 @@ def main():
 
         st.code(
             """
-            d = [(b[i] / v[i], i) for i in range(len(v))]
-            d.sort(key=lambda x: x[0], reverse=True)
-            M = 0
-            res = [0 for _ in range(len(d))]
-            for i in range(len(d)):
-                if w == 0:
-                    break
-                nb = int(w / v[d[i][1]])
-                M += nb * b[d[i][1]]
-                w -= nb * v[d[i][1]]
-                res[d[i][1]] = nb
-            return M, res, w
-
+           def density_ordered_greedy_ukp(b, v, w):
+                #Construction de la liste des densités (utilités des objets)
+                d = [(b[i]/v[i],i) for i in range(len(v))]
+                #Ordonner la liste des densités par ordre décroissant
+                d.sort(key=lambda x:x[0], reverse = True)
+                #La variable "M" stockera le gain de la solution proposée par cette heuristique
+                M = 0
+                #La liste "res" contiendra la solution à la fin. res[i] est le nombre d'exemplaires
+                #de l'objet "i"
+                res = [0 for _ in range(len(d))]
+                #On fait un parcours complet des objets
+                for i in range(len(d)):
+                    #Si la taille restante du sac à dos est égale à 0, on arrete le parcours
+                    if w==0:
+                        break
+                    #Sinon, s'il reste de l'espace dans le sac à dos : 
+                    #On calcule dans "nb" le nombre d'exemplaires possibles de l'objet d[i][1]
+                    nb = int(w/v[d[i][1]])
+                    #On met à jour le gain "M" après l'ajout de "nb" exemplaires de l'objet d[i][1]
+                    M += nb * b[d[i][1]]
+                    #On met à jour le poids restant dans le sac à dos "w"
+                    w -= nb * v[d[i][1]]
+                    #On sauvegarde le résultat "nb" dans la liste "res" à la position d[i][1] (ID de l'objet)
+                    res[d[i][1]] = nb
+                #On retourne le gain du sac à dos "M" et la liste des nombres d'exemplaires de chaque
+                #objet "res"
+                return M,res,w
         """,
             language="python",
         )
@@ -1451,18 +1563,29 @@ def main():
             # file_path = filedialog.askopenfilename(master=root)
             file_path = easygui.fileopenbox()
             if file_path != "":
-                st.text("imported !!")
+                st.text("File imported !")
                 n, w, v, b = read_data_3_single(file_path)
                 st.subheader("Solution")
                 start_time = time.time()
                 res, arr, poid = density_ordered_greedy_ukp(b, v, w)
                 arr = np.array(arr)
                 dispTime = time.time()
-                pdarr = pd.DataFrame(arr, columns=["Number of elements"])
+                #######################################################################
+                objectIDs = []
+                nbObjects = []
+                for i in range(1,len(arr)+1):
+                	if arr[i-1]!=0:
+                		objectIDs.append(i)
+                		nbObjects.append(arr[i-1])
+                arr = {'Object ID': np.array(objectIDs), "Number of elements": np.array(nbObjects)}
+                pdarr = pd.DataFrame(data=arr)
+                #########################################
+                #pdarr = pd.DataFrame(arr, columns=["Number of elements"])
                 st.dataframe(pdarr.T)
 
                 st.text(
-                    "Result :" + str(res) + " in (time): " + str(dispTime - start_time)
+                    "Result :" + str(res) + ", weight :"
+                    + str(w-poid)+ " in (time): " + str(dispTime - start_time)
                 )
         colo1, colo2 = st.beta_columns((2, 1))
         colo2.text("")
@@ -1490,19 +1613,30 @@ def main():
 
         st.code(
             """
-            d = [(v[i],i) for i in range(len(v))]
-            d.sort(key=lambda x:x[0], reverse=not ordre_croissant)
-            M = 0
-            res = [0 for _ in range(len(d))]
-            for i in range(len(d)):
-                if w==0:
-                    break
-                nb = int(w/v[d[i][1]])
-                M += nb * b[d[i][1]]
-                w -= nb * v[d[i][1]]
-                res[d[i][1]] = nb
-            return M,res
-
+           def weighted_ordered_greedy_ukp(b, v, w, ordre_croissant=False):
+                #Construction de la liste "d" contenant les couples (a,b) tel que a est le volume 
+                #de l'objet b. Cette structure nous permet de trouver le gain de l'objet 
+                #rapidement après le trie de cette liste.
+                d = [(v[i],i) for i in range(len(v))]
+                #Ordonner la liste "d" selon l'ordre croissant ou décroissant selon le paramètre
+                #ordre_croissant
+                d.sort(key=lambda x:x[0], reverse=not ordre_croissant)
+                #La variable "M" stockera le gain de la solution proposée par cette heuristique
+                M = 0
+                #La liste "res" contiendra la solution à la fin. res[i] est le nombre d'exemplaires
+                #de l'objet "i"
+                res = [0 for _ in range(len(d))]
+                #On fait la meme boucle que celle du Density Ordered Greedy
+                for i in range(len(d)):
+                    if w==0:
+                        break
+                    nb = int(w/v[d[i][1]])
+                    M += nb * b[d[i][1]]
+                    w -= nb * v[d[i][1]]
+                    res[d[i][1]] = nb
+                #On retourne le gain du sac à dos "M" et la liste des nombres d'exemplaires de chaque
+                #objet "res"
+                return M,res,w
         """,
             language="python",
         )
@@ -1521,18 +1655,28 @@ def main():
             # file_path = filedialog.askopenfilename(master=root)
             file_path = easygui.fileopenbox()
             if file_path != "":
-                st.text("imported !!")
+                st.text("File imported !")
                 n, w, v, b = read_data_3_single(file_path)
                 st.subheader("Solution")
                 start_time = time.time()
-                res, arr = weighted_ordered_greedy_ukp(b, v, w, ordreCcheck)
+                res, arr,poid = weighted_ordered_greedy_ukp(b, v, w, ordreCcheck)
                 arr = np.array(arr)
                 dispTime = time.time()
-                pdarr = pd.DataFrame(arr, columns=["Number of elements"])
+                #######################################################################
+                objectIDs = []
+                nbObjects = []
+                for i in range(1,len(arr)+1):
+                	if arr[i-1]!=0:
+                		objectIDs.append(i)
+                		nbObjects.append(arr[i-1])
+                arr = {'Object ID': np.array(objectIDs), "Number of elements": np.array(nbObjects)}
+                pdarr = pd.DataFrame(data=arr)
+                #########################################
+                #pdarr = pd.DataFrame(arr, columns=["Number of elements"])
                 st.dataframe(pdarr.T)
 
                 st.text(
-                    "Result :" + str(res) + " in (time): " + str(dispTime - start_time)
+                    "Result :" + str(res) +", weight: "+str(w-poid)+ " in (time): " + str(dispTime - start_time)
                 )
 
         colo1, colo2 = st.beta_columns((2, 1))
@@ -1624,18 +1768,29 @@ def main():
             # file_path = filedialog.askopenfilename(master=root)
             file_path = easygui.fileopenbox()
             if file_path != "":
-                st.text("imported !!")
+                st.text("File imported !")
                 n, w, v, b = read_data_3_single(file_path)
                 st.subheader("Solution")
                 start_time = time.time()
                 poid, arr, res = heuristic_arrondi(b, v, w)
                 arr = np.array(arr)
                 dispTime = time.time()
-                pdarr = pd.DataFrame(arr, columns=["Number of elements"])
+                #######################################################################
+                objectIDs = []
+                nbObjects = []
+                for i in range(1,len(arr)+1):
+                	if arr[i-1]!=0:
+                		objectIDs.append(i)
+                		nbObjects.append(arr[i-1])
+                arr = {'Object ID': np.array(objectIDs), "Number of elements": np.array(nbObjects)}
+                pdarr = pd.DataFrame(data=arr)
+                #########################################
+                #pdarr = pd.DataFrame(arr, columns=["Number of elements"])
                 st.dataframe(pdarr.T)
 
                 st.text(
-                    "Result :" + str(res) + " in (time): " + str(dispTime - start_time)
+                    "Result :" + str(res) + ", weight :"
+                    + str(poid) +" in (time): " + str(dispTime - start_time)
                 )
 
         colo1, colo2 = st.beta_columns((2, 1))
@@ -1909,25 +2064,27 @@ def main():
         col1, col2, col3 = st.beta_columns(3)
         colo1, colo2, colo3 = st.beta_columns(3)
         random.seed(1)
-        param1 = col1.number_input("Insert param1", format="%d", value=5)
-        param2 = col2.number_input("Insert param2", format="%d", value=100)
-        param3 = col3.number_input("Insert param3", value=0.9)
-        param4 = col1.number_input("Insert param4", format="%d", value=5)
+        param1 = col1.number_input("Insert number of stages", format="%d", value=5)
+        param2 = col2.number_input("Insert initial temp", format="%d", value=1000)
+        param3 = col3.number_input("Insert cooling factor", value=0.9)
+        param4 = col1.number_input("Insert final temp", format="%d", value=5)
 
         col3.text("")
         col3.text("")
         if col3.button("Upload file"):
             file_path = easygui.fileopenbox()
             if file_path != "":
-                st.text("imported !!")
+                st.text("File imported !")
                 n, w, v, b = read_data_3_single(file_path)
                 st.subheader("Solution")
                 capacity = w
                 start_time = time.time()
+                data= pd.DataFrame(list(zip(v,b)))
+                items_init=data.values.tolist()
                 sol = density_ordered_greedy_ukp(b, v, capacity)[1]
-                gain_out, capacityleft, sol = gen_random_sol(b, n, capacity)
+                gain_out, capacityleft, sol = gen_random_sol(items_init, n, capacity)
                 objects, solution, Nsol, bestEval, poids = simulatedAnnealing(
-                    b, capacity, sol, param1, param2, param3, param4
+                    items_init, capacity, sol, param1, param2, param3, param4
                 )
                 dispTime = time.time()
                 solution = np.array(solution)
@@ -1937,6 +2094,8 @@ def main():
                 st.text(
                     "Result :"
                     + str(bestEval)
+                    + ", weight :"
+                    + str(poids)
                     + " in (time): "
                     + str(dispTime - start_time)
                 )
@@ -2109,24 +2268,19 @@ def main():
         col1, col2, col3 = st.beta_columns(3)
         colo1, colo2, colo3 = st.beta_columns(3)
         random.seed(1)
-        max_it = col1.number_input("Insert a max_it", format="%d", value=500)
-        max_n = col2.number_input("Insert a max_n", format="%d", value=10)
-        N = col3.number_input("Insert a n", format="%d", value=2500)
-        NI = col1.number_input("Insert a ni", format="%d", value=100)
-        Pc = col2.number_input("Insert a pc",value=0.6)
-        Pm = col3.number_input("Insert a pm",value=0.4)
+        max_it = col1.number_input("Insert a iteration max number", format="%d", value=500)
+        max_n = col2.number_input("Insert a max stagnation iteration number", format="%d", value=10)
+        N = col3.number_input("Insert a population size", format="%d", value=2500)
+        NI = col1.number_input("Insert a subpopulation size", format="%d", value=100)
+        Pc = col2.number_input("Insert a probability of crossing",value=0.6)
+        Pm = col3.number_input("Insert a probability of mutation",value=0.4)
         stagnation = col1.checkbox("stagnation")
 
         if col3.button("Upload file"):
 
-            # root = tk.Tk()
-            # root.focus_get()
-            # root.withdraw()
-            # root.focus_force()
-            # file_path = filedialog.askopenfilename(master=root)
             file_path = easygui.fileopenbox()
             if file_path != "":
-                st.text("imported !!")
+                st.text("File imported !")
                 n, w, v, b = read_data_3_single(file_path)
                 st.subheader("Solution")
                 start_time = time.time()
@@ -2135,13 +2289,23 @@ def main():
                 )
 
                 dispTime = time.time()
-                pdarr = pd.DataFrame(arr, columns=["Number of elements"])
+                #######################################################################
+                objectIDs = []
+                nbObjects = []
+                for i in range(1,len(arr)+1):
+                	if arr[i-1]!=0:
+                		objectIDs.append(i)
+                		nbObjects.append(arr[i-1])
+                arr = {'Object ID': np.array(objectIDs), "Number of elements": np.array(nbObjects)}
+                pdarr = pd.DataFrame(data=arr)
+                #########################################
+                #pdarr = pd.DataFrame(arr, columns=["Number of elements"])
                 st.dataframe(pdarr.T)
 
                 st.text(
                     "Result :"
                     + str(res)
-                    + ", poid : "
+                    + ", weight : "
                     + str(poid)
                     + " in (time): "
                     + str(dispTime - start_time)
@@ -2401,16 +2565,16 @@ def main():
         st.subheader("Import data (Apply the algorithm on a signle file)")
         col1, col2, col3 = st.beta_columns(3)
 
-        n_ants = col1.number_input("Insert a n_ants", format="%d", value=100)
+        n_ants = col1.number_input("Insert a number of ants", format="%d", value=100)
         n_best = col2.number_input("Insert a n_best", format="%d", value=10)
-        n_iterations = col3.number_input("Insert a n_iterations", format="%d", value=10)
+        n_iterations = col3.number_input("Insert a number of iterations", format="%d", value=10)
         decay = col1.number_input("Insert a decay",value=0.8)
         alpha = col2.number_input("Insert a alpha", format="%d", value=1)
         beta = col3.number_input("Insert a beta", format="%d", value=2)
         if col2.button("Upload file"):
             file_path = easygui.fileopenbox()
             if file_path != "":
-                st.text("imported !!")
+                st.text("File imported !")
                 n, w, v, b = read_data_3_single(file_path)
                 densitySol = density_ordered_greedy_ukp(b, v, w)
                 benifices = np.array(b)
@@ -2436,13 +2600,23 @@ def main():
                 start_time = time.time()
                 arr, res, poid = colony.run(30, densitySol)
                 dispTime = time.time()
-                pdarr = pd.DataFrame(arr, columns=["Number of elements"])
+                #######################################################################
+                objectIDs = []
+                nbObjects = []
+                for i in range(1,len(arr)+1):
+                	if arr[i-1]!=0:
+                		objectIDs.append(i)
+                		nbObjects.append(arr[i-1])
+                arr = {'Object ID': np.array(objectIDs), "Number of elements": np.array(nbObjects)}
+                pdarr = pd.DataFrame(data=arr)
+                #########################################
+                #pdarr = pd.DataFrame(arr, columns=["Number of elements"])
                 st.dataframe(pdarr.T)
 
                 st.text(
                     "Result :"
                     + str(res)
-                    + ", poid :"
+                    + ", weight :"
                     + str(poid)
                     + " in (time): "
                     + str(dispTime - start_time)
@@ -2471,8 +2645,8 @@ def main():
         bbcheck = colo2.checkbox("Branch and Bound")
         dpcheck = colo2.checkbox("Dynamic Programing")
         dogcheck = colo2.checkbox("Density Ordered Greedy")
-        wdogTcheck = colo2.checkbox("Weighted Ordered Greedy (true)")
-        wdogFcheck = colo2.checkbox("Weighted Ordered Greedy (false)")
+        wdogTcheck = colo2.checkbox("Weighted Ordered Greedy (asc)")
+        wdogFcheck = colo2.checkbox("Weighted Ordered Greedy (desc)")
         hrcheck = colo2.checkbox("Heuristic By Rounding")
         agcheck = colo2.checkbox("Genetic Algorithm")
         accheck = colo2.checkbox("Ant colony")
@@ -2483,31 +2657,32 @@ def main():
             st.subheader("Genetic Algorithm Parameters")
             co1, co2, co3 = st.beta_columns(3)
 
-            max_it = co1.number_input("Insert max it", format="%d", value=500)
-            max_n = co2.number_input("Insert max_n", format="%d", value=10)
-            N = co3.number_input("Insert n", format="%d", value=2500)
-            NI = co1.number_input("Insert ni", format="%d", value=100)
-            Pc = co2.number_input("Insert pc",value=0.6)
-            Pm = co3.number_input("Insert pm",value=0.4)
+            max_it = co1.number_input("Insert iteration max number", format="%d", value=500)
+            max_n = co2.number_input("Insert max stagnation iteration number", format="%d", value=10)
+            N = co3.number_input("Insert population size", format="%d", value=2500)
+            NI = co1.number_input("Insert subpopulation size", format="%d", value=100)
+            Pc = co2.number_input("Insert probability of crossing",value=0.6)
+            Pm = co3.number_input("Insert probability of mutation",value=0.4)
             stagnation = co1.checkbox("Stagnation")
 
         if accheck:
             st.subheader("Ant Colony Parameters")
             c1, c2, c3 = st.beta_columns(3)
 
-            n_ants = c1.number_input("Insert n_ants", format="%d", value=100)
+            n_ants = c1.number_input("Insert the number of ants", format="%d", value=100)
             n_best = c2.number_input("Insert n_best", format="%d", value=10)
-            n_iterations = c3.number_input("Insert n_iterations", format="%d", value=10)
+            n_iterations = c3.number_input("Insert the number of iterations", format="%d", value=10)
             decay = c1.number_input("Insert decay",value=0.8)
             alpha = c2.number_input("Insert alpha", format="%d", value=1)
             beta = c3.number_input("Insert beta", format="%d", value=2)
         if rscheck:
             st.subheader("Recuit simulé Parameters")
             cl1, cl2, cl3 = st.beta_columns(3)
-            param1 = cl1.number_input("Insert param1", format="%d", value=5)
-            param2 = cl2.number_input("Insert param2", format="%d", value=100)
-            param3 = cl3.number_input("Insert param3", value=0.9)
-            param4 = cl1.number_input("Insert param4", format="%d", value=5)
+            param1 = cl1.number_input("Insert number of stages", format="%d", value=5)
+            param2 = cl2.number_input("Insert initial temp", format="%d", value=1000)
+            param3 = cl3.number_input("Insert cooling factor", value=0.9)
+            param4 = cl1.number_input("Insert final temp", format="%d", value=5)
+
 
         col1, col2, col3 = st.beta_columns(3)
         if col3.button("Select instances directory"):
