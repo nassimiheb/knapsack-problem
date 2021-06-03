@@ -33,8 +33,8 @@ n_iterations = 10
 decay = 0.8
 alpha = 1
 beta = 2
-param1=1000
-param2=5
+param1=5
+param2=1000
 param3=0.9
 param4=5
 ######################### Recuit simulé ########################
@@ -1179,7 +1179,7 @@ def statsComp(
         df1["Ant colony"] = gain_ac
     if rscheck:
         df1["Recuit simulé"] = gain_rs
-
+    print(gain_rs)
     df1 = df1.rename(columns={"ojt": "index"}).set_index("index")
     chart1 = st.line_chart(df1)
 
@@ -2088,7 +2088,17 @@ def main():
                 )
                 dispTime = time.time()
                 solution = np.array(solution)
-                pdarr = pd.DataFrame(solution, columns=["Number of elements"])
+                 #######################################################################
+                objectIDs = []
+                nbObjects = []
+                for i in range(1,len(Nsol)+1):
+                	if Nsol[i-1]!=0:
+                		objectIDs.append(i)
+                		nbObjects.append(Nsol[i-1])
+                arr = {'Object ID': np.array(objectIDs), "Number of elements": np.array(nbObjects)}
+                pdarr = pd.DataFrame(data=arr)
+                #########################################
+                #pdarr = pd.DataFrame(solution, columns=["Number of elements"])
                 st.dataframe(pdarr.T)
 
                 st.text(
@@ -2617,7 +2627,7 @@ def main():
                     "Result :"
                     + str(res)
                     + ", weight :"
-                    + str(poid)
+                    + str(w-poid)
                     + " in (time): "
                     + str(dispTime - start_time)
                 )
